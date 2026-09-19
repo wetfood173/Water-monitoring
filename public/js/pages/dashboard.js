@@ -74,6 +74,73 @@ export function dashboardPage(ctx) {
     );
   }
 
+  // ปุ่มขยายผังบ่อเต็มจอ (เหมือนปุ่ม fullscreen ของ YouTube) — ขยายเฉพาะการ์ดผังบ่อ
+  // ไม่ใช่ทั้งหน้า dashboard เพื่อให้เห็นแค่ถังใหญ่ ๆ ชัด ๆ เวลาเปิดจอในห้องควบคุม
+  const ICON_EXPAND =
+    '<svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M8 3H5a2 2 0 0 0-2 2v3"/><path d="M16 3h3a2 2 0 0 1 2 2v3"/><path d="M8 21H5a2 2 0 0 1-2-2v-3"/><path d="M16 21h3a2 2 0 0 0 2-2v-3"/></svg>';
+  const ICON_COMPRESS =
+    '<svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 3v3a2 2 0 0 1-2 2H4"/><path d="M15 3v3a2 2 0 0 0 2 2h3"/><path d="M9 21v-3a2 2 0 0 0-2-2H4"/><path d="M15 21v-3a2 2 0 0 1 2-2h3"/></svg>';
+
+  // ซ่อนปุ่มนี้บนจอมือถือ (ดู .fsbtn ใน app.css) — Fullscreen API ใช้งานไม่ได้ดีพอบน iPhone Safari
+  // (จัดวางไอคอนด้วย class ไม่ใช่ inline style เพราะ inline style จะทับกฎซ่อนปุ่มใน media query เสมอ)
+  const fsBtn = el("button", {
+    class: "sm fsbtn",
+    title: "ขยายผังบ่อเต็มจอ",
+    onclick: toggleFullscreen,
+  });
+
+  // iOS Safari (และ Chrome/Firefox บน iOS ที่ใช้ WebKit เดียวกัน) ไม่รองรับ Fullscreen API กับ
+  // element ทั่วไปเลย (strip.requestFullscreen จะเป็น undefined) — ใช้ class เต็มจอปลอมด้วย CSS
+  // position:fixed แทน ไม่ต้องขอสิทธิ์อะไร ใช้ได้ทุกเครื่อง กด "ขยายเต็มจอ" แล้วไม่มีอะไรเกิดขึ้นเลยคือจุดนี้
+  let pseudoFs = false;
+  const isFullscreen = () => document.fullscreenElement === strip || pseudoFs;
+
+  function updateFsBtn() {
+    fsBtn.innerHTML = isFullscreen()
+      ? `${ICON_COMPRESS}<span>ออกจากเต็มจอ</span>`
+      : `${ICON_EXPAND}<span>ขยายเต็มจอ</span>`;
+  }
+
+  function enterPseudoFullscreen() {
+    pseudoFs = true;
+    strip.classList.add("fs-mode");
+    document.body.classList.add("fs-lock");
+    updateFsBtn();
+    fitStage();
+  }
+
+  function exitPseudoFullscreen() {
+    pseudoFs = false;
+    strip.classList.remove("fs-mode");
+    document.body.classList.remove("fs-lock");
+    updateFsBtn();
+    fitStage();
+  }
+
+  function toggleFullscreen() {
+    if (pseudoFs) return exitPseudoFullscreen();
+    if (document.fullscreenElement === strip) return document.exitFullscreen();
+    // document.fullscreenEnabled คือค่าที่ถูกต้องที่สุดสำหรับเช็กว่าเบราว์เซอร์นี้รองรับจริงไหม
+    // (บน iPhone Safari จะเป็น false เสมอ แม้ requestFullscreen จะยังมีอยู่ในรูป function ก็ตาม
+    // เรียกไปแล้วบางเวอร์ชัน throw แบบ synchronous ไม่ได้ reject เป็น promise ตามสเปก จึงต้องกัน
+    // ทั้งสองทางด้วย try/catch ไม่งั้นจะหลุด error เงียบ ๆ กลางฟังก์ชัน กดแล้วไม่มีอะไรเกิดขึ้นเลย)
+    if (!strip.requestFullscreen || !document.fullscreenEnabled) return enterPseudoFullscreen();
+    try {
+      Promise.resolve(strip.requestFullscreen())
+        // ล็อกแนวนอนอัตโนมัติบนมือถือ (เหมือนเต็มจอวิดีโอ) — เดสก์ท็อปไม่รองรับ API นี้ จึงปล่อยผ่านเงียบ ๆ
+        .then(() => screen.orientation?.lock?.("landscape").catch(() => {}))
+        .catch(() => enterPseudoFullscreen());
+    } catch {
+      enterPseudoFullscreen();
+    }
+  }
+
+  const onFullscreenChange = () => {
+    updateFsBtn();
+    fitStage();
+    if (!document.fullscreenElement) screen.orientation?.unlock?.();
+  };
+
   const strip = el(
     "section",
     { class: "strip" },
@@ -81,12 +148,13 @@ export function dashboardPage(ctx) {
       "div",
       { style: "display:flex;justify-content:space-between;align-items:center;gap:10px" },
       el("h2", { style: "margin-bottom:0" }, "ผังบ่อและทิศทางการไหล"),
-      cardCloseBtn("diagram")
+      el("div", { style: "display:flex;gap:8px" }, fsBtn, cardCloseBtn("diagram"))
     ),
     el("div", { class: "stage", id: "stage" }, el("div", { class: "canvas", id: "canvasArea" })),
     el("div", { class: "mobile", id: "mobileView" })
   );
   root.append(strip);
+  updateFsBtn();
 
   const instCard = el(
     "div",
@@ -168,7 +236,7 @@ export function dashboardPage(ctx) {
       const tag = `LT-${p.pond_id}`;
       const tank = el("div", {
         class: "tank" + (box.sm ? " sm" : ""),
-        style: `left:${box.x}px;top:${box.y}px;width:${box.w}px;height:${box.h}px`,
+        style: `left:${box.x}px;top:${box.y}px;width:${box.w}px;height:${box.h}px;--tank:${POND_COLOR[p.pond_id]}`,
       });
       const vessel = el("div", {
         class: "vessel",
@@ -244,7 +312,7 @@ export function dashboardPage(ctx) {
         if (g.chain && i > 0) group.append(el("div", { class: "mconn" }, `รับน้ำจาก ${p.src_note ?? "—"}`));
         const row = el("div", { class: "mrow" });
         row.innerHTML = `
-          <div class="mtank"><div class="water" data-water="${p.pond_id}" style="height:0%"></div></div>
+          <div class="mtank" style="--tank:${POND_COLOR[p.pond_id]}"><div class="water" data-water="${p.pond_id}" style="height:0%"></div></div>
           <div class="minfo">
             <div class="top"><b>บ่อ ${p.pond_id}</b>
               <span class="pc num"><span data-pct="${p.pond_id}">—</span><i>%</i></span></div>
@@ -285,7 +353,18 @@ export function dashboardPage(ctx) {
     const stage = $("#stage", root);
     const canvas = $("#canvasArea", root);
     if (!stage || !canvas) return;
-    const scale = Math.min(1, stage.clientWidth / 1120);
+    const isFs = isFullscreen();
+    let scale = stage.clientWidth / 1120;
+    if (isFs) {
+      // เต็มจอ: มีที่ว่างทั้งจอ ให้ขยายเกิน 1 ได้ด้วย แต่ต้องไม่สูงเกินพื้นที่ที่เหลือใต้หัวข้อการ์ด
+      const headerRow = strip.firstElementChild;
+      const cs = getComputedStyle(strip);
+      const availH =
+        strip.clientHeight - headerRow.offsetHeight - parseFloat(cs.paddingTop) - parseFloat(cs.paddingBottom) - 12;
+      scale = Math.min(scale, availH / 684);
+    } else {
+      scale = Math.min(1, scale);
+    }
     canvas.style.transform = `scale(${scale})`;
     stage.style.height = `${684 * scale}px`;
     // จอกว้างกว่าผัง (เช่น 1920px) — scale ค้างที่ 1 แล้วเหลือที่ว่างด้านขวา ต้องเลื่อนผังมาไว้กึ่งกลางเอง
@@ -727,6 +806,7 @@ export function dashboardPage(ctx) {
     }
 
     window.addEventListener("resize", onResize);
+    document.addEventListener("fullscreenchange", onFullscreenChange);
     timer = setInterval(async () => {
       if (document.hidden) return;
       try {
@@ -747,6 +827,9 @@ export function dashboardPage(ctx) {
     destroy() {
       if (timer) clearInterval(timer);
       window.removeEventListener("resize", onResize);
+      document.removeEventListener("fullscreenchange", onFullscreenChange);
+      if (pseudoFs) document.body.classList.remove("fs-lock");
+      if (document.fullscreenElement === strip) document.exitFullscreen();
     },
   };
 }

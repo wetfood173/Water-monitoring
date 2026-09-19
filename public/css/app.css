@@ -111,6 +111,21 @@ button:focus-visible,a:focus-visible,.vessel:focus-visible{outline:2px solid var
 .strip{background:linear-gradient(180deg,var(--deep),#0C1E25);border:1px solid var(--line);
   border-radius:var(--radius);padding:16px;margin-bottom:16px}
 .strip h2{font-size:13.5px;font-weight:500;color:var(--mute);margin-bottom:10px}
+.fsbtn{display:flex;align-items:center;gap:5px}
+.strip:fullscreen{display:flex;flex-direction:column;justify-content:center;padding:16px 16px 24px}
+.strip:fullscreen .stage{margin:auto}
+/* จอมือถือปกติซ่อนผังกว้างแล้วโชว์ .mobile แทน (media query ด้านล่าง) — แต่พอเต็มจอ (แนวนอนแบบดูวิดีโอ)
+   ให้บังคับกลับมาโชว์ผังกว้างเสมอ ไม่งั้นจะเห็นแต่รายการเรียงเป็นแถวเต็มจอ ไม่เห็นทิศทางท่อ/เค้าโครงจริง */
+.strip:fullscreen .stage{display:block}
+.strip:fullscreen .mobile{display:none}
+
+/* iOS Safari ไม่รองรับ Fullscreen API กับ element ทั่วไปเลย (ใช้ได้แค่กับ <video>)
+   จึงต้องมี fallback จำลองเต็มจอด้วย CSS position:fixed แทน ใช้กฎเดียวกับข้างบนทุกอย่าง */
+.strip.fs-mode{position:fixed;inset:0;z-index:95;margin:0;border-radius:0;background:var(--ink);
+  display:flex;flex-direction:column;justify-content:center;padding:16px 16px 24px}
+.strip.fs-mode .stage{display:block;margin:auto}
+.strip.fs-mode .mobile{display:none}
+body.fs-lock{overflow:hidden}
 .hstat{display:flex;gap:26px;align-items:flex-end;flex-wrap:wrap}
 .hstat div{text-align:right}
 .hstat .k{font-size:12.5px;color:var(--mute)}
@@ -122,7 +137,7 @@ button:focus-visible,a:focus-visible,.vessel:focus-visible{outline:2px solid var
 .pipes .eqbox{fill:#122C35;stroke:#2E606D}
 .pipes .eqtxt{font-family:"Noto Sans Thai",sans-serif;font-size:13px;fill:#B9D2D6}
 .tank{position:absolute;z-index:2}
-.vessel{position:absolute;inset:0;border:1px solid var(--line);border-top:none;border-radius:0 0 6px 6px;
+.vessel{position:absolute;inset:0;border:1px solid var(--tank,var(--line));border-top:none;border-radius:0 0 6px 6px;
   background:repeating-linear-gradient(180deg,transparent 0 24px,rgba(255,255,255,.05) 24px 25px);
   overflow:hidden;cursor:pointer}
 .water{position:absolute;left:0;right:0;bottom:0;color:var(--water);
@@ -151,7 +166,8 @@ button:focus-visible,a:focus-visible,.vessel:focus-visible{outline:2px solid var
 .tap .tv b{font-family:"Barlow Semi Condensed",sans-serif;font-variant-numeric:tabular-nums;
   font-size:27px;font-weight:600;line-height:1}
 .tap .tv i{font-style:normal;font-size:12px;color:var(--mute)}
-.caption{position:absolute;left:0;width:100%;text-align:center;line-height:1.3;font-size:15px;font-weight:600}
+.caption{position:absolute;left:0;width:100%;text-align:center;line-height:1.3;font-size:15px;font-weight:600;
+  color:var(--tank,var(--bone))}
 .softener{position:absolute;z-index:2;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:2px}
 .softener b{font-size:14px;font-weight:600;margin-top:5px}
 .dial{position:absolute;z-index:2;width:254px;background:var(--panel);border:1px solid var(--line);
@@ -171,7 +187,7 @@ button:focus-visible,a:focus-visible,.vessel:focus-visible{outline:2px solid var
 .mgroup>h4{font-size:12.5px;font-weight:500;color:var(--mute);margin-bottom:8px}
 .mrow{display:flex;gap:12px;align-items:center;background:var(--panel);border:1px solid var(--line);
   border-radius:var(--radius);padding:10px 12px}
-.mtank{flex:0 0 40px;height:62px;position:relative;border:1px solid var(--line);border-top:none;
+.mtank{flex:0 0 40px;height:62px;position:relative;border:1px solid var(--tank,var(--line));border-top:none;
   border-radius:0 0 5px 5px;overflow:hidden}
 .minfo{flex:1;min-width:0}
 .minfo .top{display:flex;justify-content:space-between;align-items:baseline;gap:8px}
@@ -241,6 +257,7 @@ footer.appfoot{max-width:1400px;margin:0 auto;padding:0 18px 24px;color:var(--mu
   .hstat{gap:16px;width:100%;justify-content:space-between}
   .hstat div{text-align:left} .hstat .v{font-size:20px}
   .stage{display:none} .mobile{display:block}
+  .fsbtn{display:none}
   .inst{grid-template-columns:1fr}
   .gauge .read b{font-size:32px}
   .arow{grid-template-columns:52px 1fr auto;gap:8px}
