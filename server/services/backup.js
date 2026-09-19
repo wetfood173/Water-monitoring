@@ -2,6 +2,7 @@ import fs from "node:fs";
 import path from "node:path";
 import { ROOT } from "../config.js";
 import { backup as dbBackup } from "../db/index.js";
+import { uploadBackupToCloud } from "./backupCloud.js";
 
 /**
  * สำรองข้อมูลรายวัน (Product.md ข้อ 7) — เรียก dbBackup() ซึ่งดึง snapshot จากในตัว process
@@ -10,6 +11,10 @@ import { backup as dbBackup } from "../db/index.js";
  *
  * เก็บไว้ที่ data/backups/backup-YYYYMMDD-HHMMSS.tar.gz แล้วลบไฟล์เก่าเกิน KEEP ไฟล์ล่าสุดทิ้ง
  * ทดสอบกู้คืนได้ด้วย server/db/restore.js (Product.md ข้อ 7 — ทดสอบกู้คืนอย่างน้อยไตรมาสละครั้ง)
+ *
+ * ถ้าตั้งค่า R2_* ไว้ใน .env จะอัปโหลดสำเนาขึ้น Cloudflare R2 ต่อทันที กันกรณีเครื่อง/ดิสก์
+ * ที่รันเซิร์ฟเวอร์เสียหายพร้อมกับไฟล์ backup ในเครื่อง — อัปโหลดไม่สำเร็จก็ไม่ทำให้ backup
+ * ในเครื่องเสียตาม แค่ log error ไว้เตือน
  */
 
 export const BACKUP_DIR = path.join(ROOT, "data", "backups");
@@ -31,6 +36,13 @@ export async function runBackup() {
   fs.writeFileSync(path.join(BACKUP_DIR, name), buf);
 
   await pruneOldBackups();
+
+  try {
+    await uploadBackupToCloud(name, buf);
+  } catch (e) {
+    console.error(`[backup] อัปโหลดขึ้น cloud ไม่สำเร็จ (${name}):`, e.message);
+  }
+
   return name;
 }
 

@@ -81,6 +81,16 @@ export const config = {
   simulate: bool(process.env.SIMULATE, !isProd) && !modbusEnabled,
   simulateIntervalMs: int(process.env.SIMULATE_INTERVAL_MS, 5000),
 
+  // อัปโหลด backup ขึ้น Cloudflare R2 (S3-compatible) หลังสำรองข้อมูลเสร็จทุกครั้ง
+  // ถ้าไม่ตั้งค่าไว้ (ไม่มี bucket) จะข้ามขั้นตอนนี้ไป เก็บไว้แค่ในเครื่องตามเดิม
+  r2: {
+    accountId: process.env.R2_ACCOUNT_ID || "",
+    accessKeyId: process.env.R2_ACCESS_KEY_ID || "",
+    secretAccessKey: process.env.R2_SECRET_ACCESS_KEY || "",
+    bucket: process.env.R2_BUCKET || "",
+    prefix: process.env.R2_PREFIX || "backups/",
+  },
+
   session: {
     // หมดอายุเมื่อไม่มีการใช้งานติดต่อกัน 30 วัน
     // ทุก request จะเลื่อนวันหมดอายุออกไปอีก 30 วัน ใช้งานอยู่เรื่อย ๆ จึงไม่ต้องล็อกอินใหม่
