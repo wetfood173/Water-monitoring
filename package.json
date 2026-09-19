@@ -1,0 +1,25 @@
+{
+  "name": "water-monitoring",
+  "version": "1.0.0",
+  "description": "ระบบเฝ้าระวังน้ำ 7 บ่อ พร้อมระบบผู้ใช้ LINE Login และแจ้งเตือนผ่าน LINE OA",
+  "type": "module",
+  "private": true,
+  "engines": {
+    "node": ">=20.11"
+  },
+  "scripts": {
+    "start": "node server/index.js",
+    "dev": "node --watch server/index.js",
+    "migrate": "node server/db/migrate.js",
+    "seed": "node server/db/migrate.js --seed",
+    "reset": "node server/db/migrate.js --reset",
+    "restore:verify": "node server/db/restore.js"
+  },
+  "dependencies": {
+    "@electric-sql/pglite": "^0.2.17",
+    "cookie-parser": "^1.4.7",
+    "express": "^4.21.2",
+    "mongodb": "^7.6.0",
+    "pg": "^8.13.1"
+  }
+}

@@ -1,0 +1,659 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>ระบบเฝ้าระวังน้ำ — 7 บ่อ</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Barlow+Semi+Condensed:wght@400;500;600&family=Noto+Sans+Thai:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+:root{
+  --ink:#0B1A20; --deep:#0F242C; --line:#1F4550;
+  --bone:#D6E4E5; --mute:#7C9BA2;
+  --water:#3FB4A8; --water-deep:#1E7E77;
+  --warn:#E3A33C; --alarm:#E2594B; --pipe:#8FB6BC;
+  --radius:3px;
+}
+*{box-sizing:border-box;margin:0;padding:0}
+html{-webkit-text-size-adjust:100%}
+body{background:var(--ink);color:var(--bone);font-family:"Noto Sans Thai",system-ui,sans-serif;
+  font-size:15px;line-height:1.5;padding:18px;min-height:100vh}
+.num{font-family:"Barlow Semi Condensed",sans-serif;font-variant-numeric:tabular-nums}
+
+header{display:flex;flex-wrap:wrap;gap:14px;align-items:flex-end;justify-content:space-between;
+  border-bottom:1px solid var(--line);padding-bottom:14px;margin-bottom:18px}
+h1{font-size:21px;font-weight:600;line-height:1.2}
+header .sub{color:var(--mute);font-size:13.5px;margin-top:2px}
+.hstat{display:flex;gap:26px;align-items:flex-end}
+.hstat div{text-align:right}
+.hstat .k{font-size:12.5px;color:var(--mute)}
+.hstat .v{font-size:26px;font-weight:600;line-height:1.1}
+.dot{width:8px;height:8px;border-radius:50%;background:var(--water);
+  box-shadow:0 0 0 3px rgba(63,180,168,.18);display:inline-block;margin-right:7px}
+
+.strip{background:linear-gradient(180deg,var(--deep),#0C1E25);border:1px solid var(--line);
+  border-radius:var(--radius);padding:16px;margin-bottom:16px}
+.strip h2{font-size:13.5px;font-weight:500;color:var(--mute);margin-bottom:10px}
+
+/* ---------- ผังจอใหญ่ ---------- */
+.stage{position:relative;width:100%;overflow:hidden}
+.canvas{position:relative;width:1120px;height:684px;transform-origin:top left}
+.pipes{position:absolute;inset:0;pointer-events:none;z-index:3}
+.pipes .eqbox{fill:#122C35;stroke:#2E606D}
+.pipes .eqtxt{font-family:"Noto Sans Thai",sans-serif;font-size:13px;fill:#B9D2D6}
+.tank{position:absolute;z-index:2}
+.vessel{position:absolute;inset:0;border:1px solid var(--line);border-top:none;border-radius:0 0 6px 6px;
+  background:repeating-linear-gradient(180deg,transparent 0 24px,rgba(255,255,255,.05) 24px 25px);
+  overflow:hidden;cursor:pointer}
+.vessel:focus-visible{outline:2px solid var(--water);outline-offset:2px}
+.water{position:absolute;left:0;right:0;bottom:0;color:var(--water);
+  background:linear-gradient(180deg,var(--water),var(--water-deep));
+  transition:height .9s cubic-bezier(.4,0,.2,1),background .4s,color .4s}
+.water::before{content:"";position:absolute;top:-7px;left:0;width:200%;height:14px;background:currentColor;
+  -webkit-mask:url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 120 14' preserveAspectRatio='none'><path d='M0 7 q15 -7 30 0 t30 0 t30 0 t30 0 V14 H0Z' fill='%23000'/></svg>") repeat-x;
+  mask:url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 120 14' preserveAspectRatio='none'><path d='M0 7 q15 -7 30 0 t30 0 t30 0 t30 0 V14 H0Z' fill='%23000'/></svg>") repeat-x;
+  -webkit-mask-size:50% 100%;mask-size:50% 100%;animation:drift 7s linear infinite}
+@keyframes drift{to{transform:translateX(-50%)}}
+@keyframes dash{to{stroke-dashoffset:-24}}
+.water.hi{background:linear-gradient(180deg,#E9765F,var(--alarm));color:#E9765F}
+.water.lo{background:linear-gradient(180deg,#EDB958,var(--warn));color:#EDB958}
+.pctbox{position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;
+  pointer-events:none;text-shadow:0 1px 6px rgba(0,0,0,.6)}
+.pctbox .p{font-family:"Barlow Semi Condensed",sans-serif;font-variant-numeric:tabular-nums;
+  font-size:28px;font-weight:600;line-height:1}
+.pctbox .p i{font-style:normal;font-size:14px;font-weight:400;opacity:.75}
+.pctbox .m3{font-family:"Barlow Semi Condensed",sans-serif;font-size:12px;color:#E9F4F4;opacity:.85}
+.sm .pctbox .p{font-size:21px}
+.inwater{display:none}
+.tap{position:absolute;z-index:2;width:112px;background:#0D2129;border:1px solid var(--line);
+  border-radius:var(--radius);padding:8px 10px}
+.tap small{display:block;font-size:11px;color:var(--mute);line-height:1.35}
+.tap .tv{display:flex;align-items:baseline;gap:4px;margin-top:3px}
+.tap .tv b{font-family:"Barlow Semi Condensed",sans-serif;font-variant-numeric:tabular-nums;
+  font-size:27px;font-weight:600;line-height:1}
+.tap .tv i{font-style:normal;font-size:12px;color:var(--mute)}
+.caption{position:absolute;left:0;width:100%;text-align:center;line-height:1.3;font-size:15px;font-weight:600}
+
+.softener{position:absolute;z-index:2;display:flex;flex-direction:column;
+  align-items:center;justify-content:center;gap:2px}
+.softener b{font-size:14px;font-weight:600;margin-top:5px}
+
+/* หน้าปัดแรงดัน */
+.dial{position:absolute;z-index:2;width:254px;background:#0D2129;border:1px solid var(--line);
+  border-radius:var(--radius);padding:12px}
+.dtitle{display:flex;justify-content:space-between;align-items:baseline;gap:8px;font-size:13.5px;line-height:1.3}
+.dtitle small{display:block;color:var(--mute);font-size:11.5px}
+.dstate{font-size:12px;color:var(--mute);white-space:nowrap}
+.dial svg{display:block}
+.dial .val{font-family:"Barlow Semi Condensed",sans-serif;font-size:34px;font-weight:600;
+  font-variant-numeric:tabular-nums;fill:var(--bone)}
+.dial .unit{font-family:"Noto Sans Thai",sans-serif;font-size:13px;fill:var(--mute)}
+.dial .end{font-family:"Barlow Semi Condensed",sans-serif;font-size:11.5px;fill:var(--mute)}
+
+/* ---------- ผังจอเล็ก ---------- */
+.mobile{display:none}
+.mgroup{margin-bottom:14px}
+.mgroup>h4{font-size:12.5px;font-weight:500;color:var(--mute);margin-bottom:8px}
+.mrow{display:flex;gap:12px;align-items:center;background:#0D2129;border:1px solid var(--line);
+  border-radius:var(--radius);padding:10px 12px}
+.mtank{flex:0 0 40px;height:62px;position:relative;border:1px solid var(--line);border-top:none;
+  border-radius:0 0 5px 5px;overflow:hidden}
+.minfo{flex:1;min-width:0}
+.minfo .top{display:flex;justify-content:space-between;align-items:baseline;gap:8px}
+.minfo b{font-size:16px;font-weight:600}
+.minfo .pc{font-family:"Barlow Semi Condensed",sans-serif;font-size:22px;font-weight:600;font-variant-numeric:tabular-nums}
+.minfo .pc i{font-style:normal;font-size:12px;font-weight:400;color:var(--mute)}
+.minfo .rl{font-size:11.5px;color:var(--mute)}
+.mbar{height:5px;background:#0A181E;border-radius:3px;overflow:hidden;margin:7px 0 5px}
+.mbar>span{display:block;height:100%;background:var(--water);border-radius:3px;transition:width .8s ease}
+.mconn{display:flex;align-items:center;gap:7px;color:var(--mute);font-size:12px;padding:5px 0 5px 14px}
+.mconn::before{content:"";width:1px;height:14px;background:var(--pipe);opacity:.6}
+
+/* ---------- แผงข้อมูล ---------- */
+.stack{display:flex;flex-direction:column;gap:16px}
+.card{background:var(--deep);border:1px solid var(--line);border-radius:var(--radius);padding:16px}
+.card h3{font-size:13.5px;font-weight:500;color:var(--mute);margin-bottom:12px;
+  display:flex;justify-content:space-between;align-items:center;gap:10px}
+.inst{display:grid;grid-template-columns:repeat(4,1fr);gap:12px}
+.gauge{background:#0D2129;border:1px solid var(--line);border-radius:var(--radius);padding:13px 14px}
+.gauge .lbl{font-size:13px;line-height:1.35}
+.gauge .lbl small{display:block;color:var(--mute);font-size:11.5px}
+.gauge .read{display:flex;align-items:baseline;gap:5px;margin:8px 0 9px}
+.gauge .read b{font-family:"Barlow Semi Condensed",sans-serif;font-size:36px;font-weight:600;
+  line-height:1;font-variant-numeric:tabular-nums}
+.gauge .read i{font-style:normal;color:var(--mute);font-size:14px}
+.bar{height:5px;background:#0A181E;border-radius:3px;position:relative;overflow:hidden}
+.bar>span{position:absolute;left:0;top:0;bottom:0;border-radius:3px;transition:width .8s ease,background .4s}
+.mark{position:absolute;top:-2px;bottom:-2px;width:1px;background:rgba(255,255,255,.42)}
+.range{display:flex;justify-content:space-between;font-size:11px;color:var(--mute);margin-top:5px}
+
+.tabs{display:flex;flex-wrap:wrap;gap:6px}
+.tabrow{display:flex;gap:10px;align-items:flex-start;margin-bottom:8px}
+.tabrow .tl{flex:0 0 62px;font-size:11.5px;color:var(--mute);padding-top:6px;line-height:1.2}
+.seg{display:inline-flex;background:#0A181E;border:1px solid var(--line);border-radius:20px;
+  padding:3px;gap:2px;margin-bottom:12px}
+.seg button{font:inherit;font-size:12.5px;padding:4px 13px;border-radius:20px;cursor:pointer;
+  background:transparent;color:var(--mute);border:none}
+.seg button[aria-selected="true"]{background:#1E4A56;color:var(--bone);font-weight:600}
+.seg button:focus-visible,.tabs button:focus-visible{outline:2px solid var(--water);outline-offset:2px}
+.legend{display:none;flex-wrap:wrap;gap:12px;margin:4px 0 2px;font-size:12px;color:var(--mute)}
+.legend.on{display:flex}
+.legend i{width:14px;height:3px;border-radius:2px;display:inline-block;vertical-align:3px;margin-right:5px}
+.tabs button{font:inherit;font-size:13px;padding:5px 11px;border-radius:20px;cursor:pointer;
+  background:#0D2129;color:var(--mute);border:1px solid var(--line)}
+.tabs button[aria-selected="true"]{background:var(--water);border-color:var(--water);color:#05171A;font-weight:600}
+canvas{width:100%;height:280px;display:block}
+
+.alist{display:flex;flex-direction:column;max-height:250px;overflow:auto}
+.arow{display:grid;grid-template-columns:50px 66px 1fr auto;gap:9px;align-items:center;
+  padding:9px 2px;border-bottom:1px solid #17353F;font-size:13.5px}
+.arow:last-child{border-bottom:none}
+.arow .t,.arow .tg{font-family:"Barlow Semi Condensed",sans-serif;font-size:13px}
+.arow .t{color:var(--mute)}
+.sev{width:3px;height:16px;border-radius:2px;display:inline-block;vertical-align:-3px;margin-right:8px}
+.sev.a{background:var(--alarm)} .sev.w{background:var(--warn)}
+.ack{font:inherit;font-size:12px;padding:3px 9px;border-radius:20px;border:1px solid var(--line);
+  background:transparent;color:var(--mute);cursor:pointer}
+.ack:hover{color:var(--bone);border-color:var(--water)}
+.acked{opacity:.5}
+.empty{color:var(--mute);font-size:13.5px;padding:18px 2px}
+footer{margin-top:16px;color:var(--mute);font-size:12.5px;display:flex;flex-wrap:wrap;gap:12px;justify-content:space-between}
+
+@media (max-width:1000px){ .inst{grid-template-columns:1fr 1fr} }
+@media (max-width:760px){
+  body{padding:12px;font-size:14.5px}
+  h1{font-size:18px}
+  header{gap:12px} .hstat{gap:18px;width:100%;justify-content:space-between}
+  .hstat div{text-align:left} .hstat .v{font-size:20px}
+  .stage{display:none} .mobile{display:block}
+  .inst{grid-template-columns:1fr}
+  .gauge .read b{font-size:32px}
+  .arow{grid-template-columns:46px 1fr auto;gap:8px}
+  .arow .tg{display:none}
+  canvas{height:190px}
+}
+@media (prefers-reduced-motion:reduce){*{animation:none!important;transition:none!important}}
+</style>
+</head>
+<body>
+
+<header>
+  <div>
+    <h1>ระบบเฝ้าระวังน้ำ — 7 บ่อ</h1>
+    <div class="sub">1A · 1B · 2 · 3 · 4 · 5 · 600Q<span id="clock" class="num"></span></div>
+  </div>
+  <div class="hstat">
+    <div><div class="k">ปริมาณน้ำรวม</div><div class="v num" id="totalVol">—</div></div>
+    <div><div class="k">แจ้งเตือนค้าง</div><div class="v num" id="alarmCount">0</div></div>
+    <div><div class="k">สถานะสัญญาณ</div><div class="v" style="font-size:14px"><span class="dot"></span>รับค่าอยู่</div></div>
+  </div>
+</header>
+
+<section class="strip">
+  <h2>ผังบ่อและทิศทางการไหล</h2>
+  <div class="stage" id="stage">
+    <div class="canvas" id="canvasArea">
+      <svg class="pipes" viewBox="0 0 1120 684" id="pipes" aria-hidden="true"></svg>
+    </div>
+  </div>
+  <div class="mobile" id="mobile"></div>
+</section>
+
+<div class="stack">
+  <div class="card">
+    <h3>เครื่องมือวัดกระบวนการ</h3>
+    <div class="inst" id="inst"></div>
+  </div>
+
+  <div class="card">
+    <h3><span>แนวโน้มย้อนหลัง</span><span class="num" id="chartNow" style="color:var(--bone)"></span></h3>
+    <div class="seg" id="ranges" role="tablist"></div>
+    <div class="tabrow"><span class="tl">ระดับน้ำ</span><div class="tabs" id="tabsA" role="tablist"></div></div>
+    <div class="tabrow"><span class="tl">เครื่องมือวัด</span><div class="tabs" id="tabsB" role="tablist"></div></div>
+    <div class="legend" id="legend"></div>
+    <canvas id="chart"></canvas>
+  </div>
+
+  <div class="card">
+    <h3><span>บันทึกการแจ้งเตือน</span><button class="ack" id="ackAll">รับทราบทั้งหมด</button></h3>
+    <div class="alist" id="alist"><div class="empty">ยังไม่มีการแจ้งเตือน ทุกค่าอยู่ในช่วงปกติ</div></div>
+  </div>
+</div>
+
+<footer>
+  <span>อัปเดตทุก 2 วินาที · ข้อมูลจำลองสำหรับตรวจแบบหน้าจอ</span>
+  <span>HH/LL = ขีดจำกัดสูง/ต่ำ</span>
+</footer>
+
+<script>
+"use strict";
+/* ================= ผังตาม layout ที่กำหนด (แคนวาส 1060×684) =================
+   สายน้ำ: Softener → 1B → บ่อ 2 → บ่อ 3 / บ่อ 4 → บ่อ 5 → Cooling Tower → 1B
+   น้ำกลับจาก Retort A–E เข้าบ่อ 2, Retort F–N เข้าบ่อ 4
+   Softener → 1A (จ่ายสายผลิต) และ 600Q แยกอิสระ */
+const ponds=[
+ {id:"5",   x:140,y:170,w:110,h:155,cap:3000,lvl:73,hi:92,lo:35,
+  role:"จุดวัดอุณหภูมิ", from:"บ่อ 4", to:"Cooling Tower → บ่อ 1B"},
+ {id:"4",   x:305,y:170,w:110,h:155,cap:2400,lvl:59,hi:90,lo:30,
+  role:"รับน้ำกลับ Retort F–N", from:"บ่อ 2 · Retort F–N", to:"บ่อ 5"},
+ {id:"3",   x:490,y:170,w:110,h:155,cap:1800,lvl:71,hi:90,lo:25,
+  role:"รับน้ำจาก Cooling Tower", from:"บ่อ 2 · Cooling Tower", to:"—"},
+ {id:"2",   x:655,y:170,w:110,h:155,cap:1800,lvl:66,hi:90,lo:25,
+  role:"บ่อกระจายน้ำ", from:"บ่อ 1B · Retort A–E", to:"บ่อ 3 · บ่อ 4 · Cooling Tower"},
+ {id:"1B",  x:840,y:170,w:105,h:62, cap:1200,lvl:57,hi:88,lo:22, sm:1,
+  role:"รับน้ำอ่อน + น้ำกลับ", from:"Softener · Cooling Tower", to:"บ่อ 2"},
+ {id:"1A",  x:840,y:262,w:105,h:62, cap:1200,lvl:64,hi:88,lo:22, sm:1,
+  role:"จ่ายเข้าสายผลิต", from:"Softener", to:"สายการผลิต"},
+ {id:"600Q",x:95, y:470,w:200,h:100,cap:6000,lvl:48,hi:85,lo:20,
+  role:"บ่ออิสระ", from:"ท่อน้ำเข้า", to:"—"}
+];
+const pipes=[
+ {d:"M195 170 V60 H892 V166"},       /* บ่อ 5 → Cooling Tower → บ่อ 1B */
+ {d:"M672 170 V110 H545 V166"},      /* บ่อ 2 → Cooling Tower → บ่อ 3 */
+ {d:"M360 36 V166"},                 /* Retort F–N → บ่อ 4 */
+ {d:"M730 36 V166"},                 /* Retort A–E → บ่อ 2 */
+ {d:"M750 325 V395 H335 V329"},      /* บ่อ 2 → บ่อ 4 (เดินใต้แถว) */
+ {d:"M305 245 H258"},                /* บ่อ 4 → บ่อ 5 */
+ {d:"M655 245 H608"},                /* บ่อ 2 → บ่อ 3 */
+ {d:"M840 201 H773"},                /* บ่อ 1B → บ่อ 2 */
+ {d:"M985 201 H953"},                /* Softener → บ่อ 1B */
+ {d:"M985 293 H953"},                /* Softener → บ่อ 1A */
+ {d:"M20 520 H91"}                   /* ท่อน้ำเข้า → บ่อ 600Q */
+];
+/* เส้นประบาง ๆ เชื่อมป้ายเซนเซอร์เข้ากับถัง */
+const taps=[{d:"M124 247 H136"},{d:"M299 520 H311"}];
+const equips=[
+ {x:295,y:10, w:130,h:26,label:"Retort F–N"},
+ {x:665,y:10, w:130,h:26,label:"Retort A–E"},
+ {x:388,y:47, w:124,h:26,label:"Cooling Tower"},
+ {x:558,y:97, w:100,h:26,label:"Cooling Tower"}
+];
+const inst={
+ temp: {tag:"TT-05",   name:"อุณหภูมิน้ำ บ่อ 5",          unit:"°C",  v:32.4,min:15,max:60, hh:45, ll:20, color:"#E08A4F",dp:1},
+ flow: {tag:"FT-600Q", name:"อัตราการไหลขาเข้า บ่อ 600Q", unit:"m³/h",v:118, min:0, max:200,hh:180,ll:40, color:"#5B9BD5",dp:0},
+ air:  {tag:"PT-AIR",  name:"แรงดันลม",                  unit:"bar", v:6.2, min:0, max:10, hh:8.5,ll:4.5,color:"#8FB9DC",dp:2},
+ steam:{tag:"PT-STM",  name:"แรงดันไอน้ำ",                unit:"bar", v:7.1, min:0, max:12, hh:9.5,ll:5.0,color:"#C9A227",dp:2}
+};
+let totalizer=48213;
+
+/* ---------- เส้นท่อ + กล่องอุปกรณ์ ---------- */
+const area=document.getElementById("canvasArea");
+let sv=`<defs><marker id="ah" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6" markerHeight="6" orient="auto">
+ <path d="M0 0 L10 5 L0 10 z" fill="var(--pipe)"/></marker></defs>`;
+pipes.forEach(p=>{
+  sv+=`<path d="${p.d}" fill="none" stroke="#0B1A20" stroke-width="6" stroke-linejoin="round"/>
+       <path d="${p.d}" fill="none" stroke="var(--pipe)" stroke-width="2" stroke-linejoin="round" marker-end="url(#ah)"/>
+       <path d="${p.d}" fill="none" stroke="#fff" stroke-width="2" stroke-linejoin="round"
+             stroke-dasharray="3 21" opacity=".8" style="animation:dash 1.6s linear infinite"/>`;
+});
+taps.forEach(t=>{
+  sv+=`<path d="${t.d}" fill="none" stroke="var(--mute)" stroke-width="1.5" stroke-dasharray="3 3"/>`;
+});
+equips.forEach(e=>{
+  sv+=`<rect class="eqbox" x="${e.x}" y="${e.y}" width="${e.w}" height="${e.h}" rx="4"/>
+       <text class="eqtxt" x="${e.x+e.w/2}" y="${e.y+e.h/2+4.5}" text-anchor="middle">${e.label}</text>`;
+});
+document.getElementById("pipes").innerHTML=sv;
+
+/* ---------- ถังน้ำ ---------- */
+ponds.forEach(p=>{
+  const d=document.createElement("div");
+  d.className="tank"+(p.sm?" sm":"");
+  d.style.cssText=`left:${p.x}px;top:${p.y}px;width:${p.w}px;height:${p.h}px`;
+  d.innerHTML=`<div class="vessel" tabindex="0" role="button" aria-label="บ่อ ${p.id}">
+     <div class="water" data-water="${p.id}" style="height:${p.lvl}%"></div>
+     <div class="pctbox"><div class="p num"><span data-pct="${p.id}">${p.lvl|0}</span><i>%</i></div>
+     ${p.sm?"":`<div class="m3 num" data-vol="${p.id}"></div>`}</div></div>
+   <div class="caption" style="top:${p.h+8}px">บ่อ ${p.id}</div>`;
+  area.appendChild(d);
+  const go=()=>select("L"+p.id);
+  const v=d.querySelector(".vessel");
+  v.addEventListener("click",go);
+  v.addEventListener("keydown",e=>{if(e.key==="Enter"||e.key===" "){e.preventDefault();go();}});
+});
+
+/* ---------- ป้ายเซนเซอร์ข้างถัง ---------- */
+[{x:20,y:216,lab:"อุณหภูมิน้ำ · TT-05",attr:"data-ctemp",unit:"°C",c:"#E08A4F",key:"temp"},
+ {x:315,y:490,lab:"อัตราไหลขาเข้า · FT-600Q",attr:"data-cflow",unit:"m³/h",c:"#5B9BD5",key:"flow"}
+].forEach(t=>{
+  const el=document.createElement("div");
+  el.className="tap";
+  el.style.cssText=`left:${t.x}px;top:${t.y}px;border-left:2px solid ${t.c};cursor:pointer`;
+  el.tabIndex=0;el.setAttribute("role","button");
+  el.innerHTML=`<small>${t.lab}</small>
+    <div class="tv"><b class="num" ${t.attr}>—</b><i>${t.unit}</i></div>`;
+  el.addEventListener("click",()=>select(t.key));
+  el.addEventListener("keydown",e=>{if(e.key==="Enter"||e.key===" "){e.preventDefault();select(t.key);}});
+  area.appendChild(el);
+});
+
+/* ---------- Softener ---------- */
+const soft=document.createElement("div");
+soft.className="softener";
+soft.style.cssText="left:985px;top:190px;width:118px;height:120px";
+soft.innerHTML=`<svg viewBox="0 0 100 84" width="100" height="84" aria-hidden="true">
+   <g fill="#16333D" stroke="#6FA9B4" stroke-width="2.2" stroke-linejoin="round">
+     <rect x="22" y="2" width="7" height="9" rx="1.5"/>
+     <rect x="41" y="2" width="7" height="9" rx="1.5"/>
+     <path d="M14 20 H5 V34" fill="none"/>
+     <path d="M58 20 H80 V44" fill="none"/>
+     <rect x="14" y="10" width="44" height="20" rx="3"/>
+     <rect x="16" y="34" width="40" height="46" rx="5"/>
+     <rect x="68" y="44" width="26" height="36" rx="4"/>
+   </g>
+   <rect x="20" y="15" width="15" height="10" rx="2" fill="#3FB4A8"/>
+   <circle cx="47" cy="17" r="2.2" fill="#6FA9B4"/>
+   <circle cx="47" cy="24" r="2.2" fill="#6FA9B4"/>
+   <path d="M36 48 c6 8 10 12 10 16 a10 10 0 0 1 -20 0 c0 -4 4 -8 10 -16 z" fill="#3FB4A8"/>
+ </svg>
+ <b>Softener</b>`;
+area.appendChild(soft);
+
+/* ---------- หน้าปัดแรงดัน ---------- */
+const CX=115,CY=112,R=78;
+const pt=(t,r=R)=>[(CX-r*Math.cos(Math.PI*t)).toFixed(1),(CY-r*Math.sin(Math.PI*t)).toFixed(1)];
+const arcp=(t0,t1,r=R)=>{const a=pt(t0,r),b=pt(t1,r);return `M${a[0]} ${a[1]} A${r} ${r} 0 0 1 ${b[0]} ${b[1]}`};
+[{k:"air",x:450,y:430},{k:"steam",x:720,y:430}].forEach(d=>{
+  const g=inst[d.k];
+  const tl=(g.ll-g.min)/(g.max-g.min), th=(g.hh-g.min)/(g.max-g.min);
+  let ticks="";
+  for(let i=0;i<=10;i++){const o=pt(i/10,R+3),n=pt(i/10,R-(i%5?5:10));
+    ticks+=`<line x1="${o[0]}" y1="${o[1]}" x2="${n[0]}" y2="${n[1]}" stroke="#2A5763" stroke-width="${i%5?1:1.6}"/>`;}
+  const el=document.createElement("div");
+  el.className="dial";
+  el.style.cssText=`left:${d.x}px;top:${d.y}px`;
+  el.innerHTML=`<div class="dtitle"><span>${g.name}<small>${g.tag}</small></span>
+      <span class="dstate" data-dialstate="${d.k}">ปกติ</span></div>
+    <svg viewBox="0 0 230 176" width="230" height="176">
+      <path d="${arcp(0,1)}" fill="none" stroke="#0A181E" stroke-width="13" stroke-linecap="round"/>
+      <path d="${arcp(0,tl)}" fill="none" stroke="#4A3A1E" stroke-width="13"/>
+      <path d="${arcp(th,1)}" fill="none" stroke="#4A241F" stroke-width="13"/>
+      ${ticks}
+      <path d="${arcp(0,1)}" pathLength="1000" data-dialarc="${d.k}" fill="none" stroke="${g.color}"
+            stroke-width="13" stroke-linecap="round" stroke-dasharray="0 1000"
+            style="transition:stroke-dasharray .8s ease,stroke .4s"/>
+      <text x="14" y="${CY+20}" class="end">LL ${g.ll}</text>
+      <text x="216" y="${CY+20}" text-anchor="end" class="end">HH ${g.hh}</text>
+      <line data-dialneedle="${d.k}" x1="${CX}" y1="${CY}" x2="${CX-62}" y2="${CY}"
+            stroke="var(--bone)" stroke-width="2.5" stroke-linecap="round"
+            transform="rotate(0 ${CX} ${CY})" style="transition:transform .9s cubic-bezier(.34,1.3,.5,1)"/>
+      <circle cx="${CX}" cy="${CY}" r="4.5" fill="var(--bone)"/>
+      <text x="${CX}" y="164" text-anchor="middle">
+        <tspan class="val" data-dialval="${d.k}">—</tspan><tspan class="unit"> ${g.unit}</tspan></text>
+    </svg>`;
+  area.appendChild(el);
+});
+
+/* ================= ผังจอเล็ก ================= */
+const groups=[
+ {h:"สายน้ำหล่อเย็น (ตามทิศทางการไหล)", ids:["1B","2","3","4","5"], chain:true},
+ {h:"บ่อแยกอิสระ", ids:["1A","600Q"], chain:false}
+];
+let mh="";
+groups.forEach(g=>{
+  mh+=`<div class="mgroup"><h4>${g.h}</h4>`;
+  g.ids.forEach((id,i)=>{
+    const p=ponds.find(x=>x.id===id);
+    if(g.chain&&i>0)mh+=`<div class="mconn">รับน้ำจาก ${p.from}</div>`;
+    mh+=`<div class="mrow">
+      <div class="mtank"><div class="water" data-water="${p.id}" style="height:${p.lvl}%"></div></div>
+      <div class="minfo">
+        <div class="top"><b>บ่อ ${p.id}</b>
+          <span class="pc num"><span data-pct="${p.id}">${p.lvl|0}</span><i>%</i></span></div>
+        <div class="rl">${p.role} · LT-${p.id}</div>
+        <div class="mbar"><span data-mbar="${p.id}" style="width:${p.lvl}%"></span></div>
+        <div class="rl"><span class="num" data-vol="${p.id}"></span> · ส่งไป ${p.to}</div>
+        ${p.id==="5"?`<div class="rl">อุณหภูมิ <b class="num" data-ctemp>—</b> °C</div>`:""}
+        ${p.id==="600Q"?`<div class="rl">น้ำเข้า <b class="num" data-cflow>—</b> m³/h</div>`:""}
+      </div></div>`;
+  });
+  mh+="</div>";
+});
+document.getElementById("mobile").innerHTML=mh;
+
+/* ================= ย่อผังให้พอดีจอ ================= */
+const stage=document.getElementById("stage"),cvs=document.getElementById("canvasArea");
+function fit(){
+  const s=Math.min(1,stage.clientWidth/1120);
+  cvs.style.transform=`scale(${s})`;
+  stage.style.height=(684*s)+"px";
+}
+addEventListener("resize",()=>{fit();draw();});
+
+/* ================= ชุดข้อมูลแนวโน้ม ================= */
+const pondColor={"5":"#3FB4A8","4":"#5B9BD5","3":"#C9A227","2":"#E08A4F",
+                 "1B":"#A78BD0","1A":"#D96FA8","600Q":"#7ED0C2"};
+const meta={};
+ponds.forEach(p=>meta["L"+p.id]={label:"บ่อ "+p.id,unit:"%",color:pondColor[p.id],
+  step:1.4,lo:5,hi:99,dp:0});
+meta.temp ={label:"อุณหภูมิ บ่อ 5",unit:"°C",  color:"#E08A4F",step:.55,lo:18,hi:58,  dp:1};
+meta.flow ={label:"อัตราไหล 600Q", unit:"m³/h",color:"#5B9BD5",step:7,  lo:0, hi:199, dp:0};
+meta.air  ={label:"แรงดันลม",      unit:"bar", color:"#8FB9DC",step:.16,lo:2, hi:9.8, dp:2};
+meta.steam={label:"แรงดันไอน้ำ",    unit:"bar", color:"#C9A227",step:.15,lo:3, hi:11.5,dp:2};
+const keys=Object.keys(meta);
+const cur=k=>k[0]==="L"?ponds.find(p=>p.id===k.slice(1)).lvl:inst[k].v;
+
+const ranges=[
+ /* span/tick หน่วยเป็นนาที · fmt "t"=เวลา, "d"=วันที่ */
+ {k:"1h", label:"1 ชม.",  n:90, amp:1,   span:60,    tick:15,   fmt:"t"},
+ {k:"24h",label:"24 ชม.", n:96, amp:2.4, span:1440,  tick:240,  fmt:"t"},
+ {k:"7d", label:"7 วัน",  n:84, amp:3.4, span:10080, tick:1440, fmt:"d"},
+ {k:"30d",label:"30 วัน", n:90, amp:4.2, span:43200, tick:7200, fmt:"d"}
+];
+/* ประวัติจำลอง: เดินสุ่มย้อนหลังจากค่าปัจจุบัน แยกความละเอียดตามช่วงเวลา */
+const H={};
+ranges.forEach(r=>{
+  H[r.k]={};
+  keys.forEach(k=>{
+    const m=meta[k]; let v=cur(k); const arr=[];
+    for(let i=0;i<r.n;i++){
+      arr.unshift(v);
+      v=Math.max(m.lo,Math.min(m.hi,v+(Math.random()-.5)*m.step*2*r.amp));
+    }
+    H[r.k][k]=arr;
+  });
+});
+let range="1h", active="ALL";
+
+const instEl=document.getElementById("inst");
+Object.entries(inst).forEach(([k,g])=>{
+  const d=document.createElement("div");d.className="gauge";
+  d.innerHTML=`<div class="lbl">${g.name}<small>${g.tag}</small></div>
+   <div class="read"><b id="g-${k}">—</b><i>${g.unit}</i></div>
+   <div class="bar"><span id="b-${k}"></span>
+     <i class="mark" style="left:${(g.ll-g.min)/(g.max-g.min)*100}%"></i>
+     <i class="mark" style="left:${(g.hh-g.min)/(g.max-g.min)*100}%"></i></div>
+   <div class="range"><span>LL ${g.ll}</span><span id="s-${k}">ปกติ</span><span>HH ${g.hh}</span></div>
+   ${k==="flow"?'<div class="range" style="margin-top:7px"><span>ปริมาณสะสมวันนี้</span><span class="num" id="totz"></span></div>':''}`;
+  instEl.appendChild(d);
+});
+
+/* ---------- ปุ่มช่วงเวลา ---------- */
+const segEl=document.getElementById("ranges");
+ranges.forEach(r=>{
+  const b=document.createElement("button");
+  b.textContent=r.label;b.dataset.r=r.k;b.setAttribute("role","tab");
+  b.setAttribute("aria-selected",r.k===range);
+  b.onclick=()=>{range=r.k;
+    [...segEl.children].forEach(x=>x.setAttribute("aria-selected",x.dataset.r===r.k));draw();};
+  segEl.appendChild(b);
+});
+
+/* ---------- ปุ่มเลือกชุดข้อมูล ---------- */
+const tabsA=document.getElementById("tabsA"),tabsB=document.getElementById("tabsB");
+const mkTab=(box,key,label)=>{
+  const b=document.createElement("button");
+  b.textContent=label;b.dataset.k=key;b.setAttribute("role","tab");
+  b.setAttribute("aria-selected",key===active);b.onclick=()=>select(key);
+  box.appendChild(b);
+};
+mkTab(tabsA,"ALL","ทุกบ่อ");
+["1A","1B","2","3","4","5","600Q"].forEach(id=>mkTab(tabsA,"L"+id,"บ่อ "+id));
+["temp","flow","air","steam"].forEach(k=>mkTab(tabsB,k,meta[k].label));
+
+const legend=document.getElementById("legend");
+legend.innerHTML=ponds.map(p=>
+  `<span><i style="background:${pondColor[p.id]}"></i>บ่อ ${p.id}</span>`).join("");
+
+function select(k){
+  active=k;
+  [...tabsA.children,...tabsB.children].forEach(b=>b.setAttribute("aria-selected",b.dataset.k===k));
+  legend.classList.toggle("on",k==="ALL");
+  draw();
+}
+
+/* ---------- วาดกราฟ ---------- */
+const cv=document.getElementById("chart"),cx=cv.getContext("2d");
+function draw(){
+  const rg=ranges.find(x=>x.k===range), n=rg.n;
+  const set=active==="ALL"?ponds.map(p=>"L"+p.id):[active];
+  const unit=meta[set[0]].unit, dp=meta[set[0]].dp;
+  const r=devicePixelRatio||1,W=cv.clientWidth,Hh=cv.clientHeight||200;
+  cv.width=W*r;cv.height=Hh*r;cx.setTransform(r,0,0,r,0,0);cx.clearRect(0,0,W,Hh);
+  const pad={l:42,r:8,t:12,b:26};
+  let mn=Infinity,mx=-Infinity;
+  set.forEach(k=>H[range][k].forEach(v=>{if(v<mn)mn=v;if(v>mx)mx=v;}));
+  const sp=(mx-mn)||1;mn-=sp*.2;mx+=sp*.2;
+  mn=Math.max(0,mn);
+  if(unit==="%")mx=Math.min(100,mx);
+  const X=i=>pad.l+i/(n-1)*(W-pad.l-pad.r),Y=v=>pad.t+(1-(v-mn)/(mx-mn))*(Hh-pad.t-pad.b);
+
+  cx.font='12px "Barlow Semi Condensed",sans-serif';cx.lineWidth=1;
+
+  /* ---- แกน X: เส้นแบ่งย่อยและป้ายเวลา ---- */
+  const now=Date.now(), pL=pad.l, pR=W-pad.r, pW=pR-pL, base=Hh-pad.b;
+  const xAt=m=>pR-(m/rg.span)*pW;
+  cx.strokeStyle="#15303A";
+  for(let t=rg.tick/2;t<rg.span;t+=rg.tick){          /* เส้นซอยย่อย */
+    const x=xAt(t);cx.beginPath();cx.moveTo(x,pad.t);cx.lineTo(x,base);cx.stroke();
+  }
+  const every=W<440?2:1;
+  let ti=0;
+  for(let t=0;t<=rg.span+.5;t+=rg.tick){              /* เส้นหลัก + ป้าย */
+    const x=xAt(t);
+    cx.strokeStyle="#224A56";cx.beginPath();cx.moveTo(x,pad.t);cx.lineTo(x,base+4);cx.stroke();
+    if(ti%every===0){
+      const d=new Date(now-t*60000);
+      const lab=rg.fmt==="t"
+        ? d.toLocaleTimeString("th-TH",{hour:"2-digit",minute:"2-digit"})
+        : d.getDate()+"/"+(d.getMonth()+1);
+      cx.fillStyle="#7C9BA2";
+      cx.textAlign = t===0?"right":(x-pL<14?"left":"center");
+      cx.fillText(lab,x,Hh-6);
+    }
+    ti++;
+  }
+
+  /* ---- แกน Y ---- */
+  for(let i=0;i<=4;i++){
+    const y=pad.t+i*(Hh-pad.t-pad.b)/4;
+    cx.strokeStyle="#1B3B45";cx.beginPath();cx.moveTo(pad.l,y);cx.lineTo(W-pad.r,y);cx.stroke();
+    cx.fillStyle="#7C9BA2";cx.textAlign="right";
+    cx.fillText((mx-(mx-mn)*i/4).toFixed(dp===0?0:1),pad.l-8,y+4);
+  }
+
+  const single=set.length===1;
+  set.forEach(k=>{
+    const data=H[range][k], col=meta[k].color;
+    if(single){
+      const g=cx.createLinearGradient(0,pad.t,0,Hh-pad.b);
+      g.addColorStop(0,col+"55");g.addColorStop(1,col+"00");
+      cx.beginPath();cx.moveTo(X(0),Hh-pad.b);
+      data.forEach((v,i)=>cx.lineTo(X(i),Y(v)));
+      cx.lineTo(X(n-1),Hh-pad.b);cx.closePath();cx.fillStyle=g;cx.fill();
+    }
+    cx.beginPath();data.forEach((v,i)=>i?cx.lineTo(X(i),Y(v)):cx.moveTo(X(i),Y(v)));
+    cx.strokeStyle=col;cx.lineWidth=single?1.8:1.5;cx.lineJoin="round";cx.stroke();
+    cx.beginPath();cx.arc(X(n-1),Y(data[n-1]),single?3.5:2.6,0,7);cx.fillStyle=col;cx.fill();
+  });
+
+  document.getElementById("chartNow").textContent=
+    single?H[range][set[0]][n-1].toFixed(dp)+" "+unit:"ระดับน้ำ 7 บ่อ (%)";
+}
+
+/* ================= แจ้งเตือน ================= */
+const alarms=[],activeKeys=new Set();
+function raise(k,sev,tag,msg){
+  if(activeKeys.has(k))return;activeKeys.add(k);
+  alarms.unshift({sev,tag,msg,time:new Date(),ack:false});
+  if(alarms.length>40)alarms.pop();renderAlarms();
+}
+const clearAlarm=k=>activeKeys.delete(k);
+function renderAlarms(){
+  const box=document.getElementById("alist"),pend=alarms.filter(a=>!a.ack).length;
+  const c=document.getElementById("alarmCount");
+  c.textContent=pend;c.style.color=pend?"var(--alarm)":"var(--bone)";
+  if(!alarms.length){box.innerHTML='<div class="empty">ยังไม่มีการแจ้งเตือน ทุกค่าอยู่ในช่วงปกติ</div>';return;}
+  box.innerHTML=alarms.map((a,i)=>`<div class="arow ${a.ack?'acked':''}">
+    <span class="t">${a.time.toLocaleTimeString("th-TH",{hour:"2-digit",minute:"2-digit"})}</span>
+    <span class="tg">${a.tag}</span>
+    <span><i class="sev ${a.sev}"></i>${a.msg}</span>
+    ${a.ack?'<span class="t">รับทราบ</span>':`<button class="ack" data-i="${i}">รับทราบ</button>`}</div>`).join("");
+  box.querySelectorAll(".ack").forEach(b=>b.onclick=()=>{alarms[+b.dataset.i].ack=true;renderAlarms();});
+}
+document.getElementById("ackAll").onclick=()=>{alarms.forEach(a=>a.ack=true);renderAlarms();};
+
+/* ================= อัปเดตค่า ================= */
+const rnd=(a,b)=>a+Math.random()*(b-a),clamp=(v,a,b)=>Math.max(a,Math.min(b,v));
+const all=(sel,fn)=>document.querySelectorAll(sel).forEach(fn);
+function tick(){
+  ponds.forEach(p=>{
+    p.lvl=clamp(p.lvl+rnd(-1.4,1.4),5,99);
+    const st=p.lvl>=p.hi?"hi":p.lvl<=p.lo?"lo":"";
+    all(`[data-water="${p.id}"]`,e=>{e.style.height=p.lvl+"%";e.className="water "+st;});
+    all(`[data-pct="${p.id}"]`,e=>e.textContent=p.lvl.toFixed(0));
+    all(`[data-vol="${p.id}"]`,e=>e.textContent=Math.round(p.cap*p.lvl/100).toLocaleString()+" m³");
+    all(`[data-mbar="${p.id}"]`,e=>{e.style.width=p.lvl+"%";
+      e.style.background=st==="hi"?"var(--alarm)":st==="lo"?"var(--warn)":"var(--water)";});
+    if(st==="hi")raise("H"+p.id,"a","LT-"+p.id,`บ่อ ${p.id} ระดับน้ำสูงเกินขีดจำกัด`);else clearAlarm("H"+p.id);
+    if(st==="lo")raise("L"+p.id,"w","LT-"+p.id,`บ่อ ${p.id} ระดับน้ำต่ำ ควรเติมน้ำ`);else clearAlarm("L"+p.id);
+  });
+  document.getElementById("totalVol").textContent=
+    Math.round(ponds.reduce((s,p)=>s+p.cap*p.lvl/100,0)).toLocaleString()+" m³";
+
+  inst.temp.v =clamp(inst.temp.v +rnd(-.5,.55),18,58);
+  inst.flow.v =clamp(inst.flow.v +rnd(-7,7),0,199);
+  inst.air.v  =clamp(inst.air.v  +rnd(-.16,.16),2,9.8);
+  inst.steam.v=clamp(inst.steam.v+rnd(-.14,.15),3,11.5);
+  totalizer+=inst.flow.v/1800;
+
+  Object.entries(inst).forEach(([k,g])=>{
+    const hi=g.v>=g.hh,lo=g.v<=g.ll,el=document.getElementById("g-"+k);
+    el.textContent=g.v.toFixed(g.dp);
+    el.style.color=hi?"var(--alarm)":lo?"var(--warn)":"var(--bone)";
+    const b=document.getElementById("b-"+k);
+    b.style.width=clamp((g.v-g.min)/(g.max-g.min)*100,0,100)+"%";
+    b.style.background=hi?"var(--alarm)":lo?"var(--warn)":g.color;
+    const s=document.getElementById("s-"+k);
+    s.textContent=hi?"สูงเกินกำหนด":lo?"ต่ำกว่ากำหนด":"ปกติ";
+    s.style.color=hi?"var(--alarm)":lo?"var(--warn)":"var(--mute)";
+    if(k==="air"||k==="steam"){
+      const t=clamp((g.v-g.min)/(g.max-g.min),0,1);
+      const c=hi?"#E2594B":lo?"#E3A33C":g.color;
+      all(`[data-dialarc="${k}"]`,e=>{e.setAttribute("stroke-dasharray",(t*1000).toFixed(0)+" 1000");
+        e.setAttribute("stroke",c);});
+      all(`[data-dialneedle="${k}"]`,e=>e.setAttribute("transform",`rotate(${(t*180).toFixed(1)} 115 112)`));
+      all(`[data-dialval="${k}"]`,e=>{e.textContent=g.v.toFixed(g.dp);
+        e.style.fill=hi?"#E2594B":lo?"#E3A33C":"var(--bone)";});
+      all(`[data-dialstate="${k}"]`,e=>{e.textContent=s.textContent;e.style.color=s.style.color;});
+    }
+    if(hi)raise("hh"+k,"a",g.tag,`${g.name} สูงเกินกำหนด`);else clearAlarm("hh"+k);
+    if(lo)raise("ll"+k,"w",g.tag,`${g.name} ต่ำกว่ากำหนด`);else clearAlarm("ll"+k);
+  });
+  document.getElementById("totz").textContent=Math.round(totalizer).toLocaleString()+" m³";
+  all("[data-ctemp]",e=>e.textContent=inst.temp.v.toFixed(1));
+  all("[data-cflow]",e=>e.textContent=inst.flow.v.toFixed(0));
+
+  keys.forEach(k=>{
+    const v=cur(k);
+    H["1h"][k].push(v);H["1h"][k].shift();          /* ช่วง 1 ชม. เลื่อนตามเวลาจริง */
+    ["24h","7d","30d"].forEach(r=>{H[r][k][H[r][k].length-1]=v;}); /* ช่วงยาว: จุดสุดท้ายเกาะค่าปัจจุบัน */
+  });
+  draw();
+}
+fit();select("ALL");setInterval(tick,2000);tick();
+setInterval(()=>{document.getElementById("clock").textContent=" · "+new Date().toLocaleTimeString("th-TH");},1000);
+</script>
+</body>
+</html>

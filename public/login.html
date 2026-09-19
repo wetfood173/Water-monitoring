@@ -1,0 +1,90 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="color-scheme" content="dark">
+<title>เข้าสู่ระบบ — ระบบเฝ้าระวังน้ำ</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Barlow+Semi+Condensed:wght@400;500;600&family=Noto+Sans+Thai:wght@400;500;600&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="/css/app.css">
+</head>
+<body>
+<div class="center-page">
+  <div class="auth-card">
+    <h1>ระบบเฝ้าระวังน้ำ</h1>
+    <div class="sub">7 บ่อ · เข้าสู่ระบบด้วยบัญชี LINE ที่ใช้อยู่แล้ว</div>
+
+    <div id="errBox" class="banner err" hidden></div>
+
+    <a id="lineLink" href="/auth/line/login">
+      <button class="line-btn" type="button">เข้าสู่ระบบด้วย LINE</button>
+    </a>
+    <p id="lineOff" class="sub" style="margin:10px 0 0" hidden>
+      ยังไม่ได้ตั้งค่า LINE Login บนเซิร์ฟเวอร์นี้ ให้ผู้ดูแลระบบกรอก
+      <code>LINE_LOGIN_CHANNEL_ID</code> และ <code>LINE_LOGIN_CHANNEL_SECRET</code> ในไฟล์ .env
+    </p>
+
+    <div id="devBox" hidden>
+      <div class="hr">หรือเข้าสู่ระบบสำหรับพัฒนา</div>
+      <form id="devForm">
+        <div class="field">
+          <label for="empCode">รหัสพนักงาน 7 หลัก</label>
+          <input id="empCode" name="emp_code" inputmode="numeric" pattern="\d{7}" maxlength="7"
+                 placeholder="0013649" autocomplete="off" required>
+        </div>
+        <button class="primary" type="submit" style="width:100%;padding:10px">เข้าสู่ระบบ</button>
+      </form>
+      <p class="sub" style="margin-top:10px">
+        โหมดนี้ข้ามการยืนยันตัวตนด้วย LINE ใช้สำหรับทดสอบเท่านั้น ปิดด้วย <code>DEV_LOGIN=false</code>
+      </p>
+    </div>
+  </div>
+</div>
+
+<script type="module">
+import { api } from "/js/api.js";
+
+const ERRORS = {
+  expired: "เซสชันหมดอายุ กรุณาเข้าสู่ระบบใหม่",
+  inactive: "บัญชีนี้ถูกปิดใช้งาน ติดต่อผู้ดูแลระบบ",
+  line_failed: "เชื่อมต่อกับ LINE ไม่สำเร็จ กรุณาลองใหม่",
+  line_disabled: "ยังไม่ได้ตั้งค่า LINE Login บนเซิร์ฟเวอร์นี้",
+  state_missing: "การเข้าสู่ระบบหมดเวลา กรุณาเริ่มใหม่",
+  state_invalid: "คำขอเข้าสู่ระบบไม่ถูกต้อง กรุณาเริ่มใหม่",
+  state_mismatch: "คำขอเข้าสู่ระบบไม่ตรงกัน กรุณาเริ่มใหม่",
+};
+
+const err = new URLSearchParams(location.search).get("error");
+if (err) {
+  const box = document.getElementById("errBox");
+  box.textContent = ERRORS[err] ?? "เข้าสู่ระบบไม่สำเร็จ กรุณาลองใหม่";
+  box.hidden = false;
+}
+
+const me = await api.get("/api/me").catch(() => null);
+if (me?.authenticated) location.replace("/");
+else if (me?.pendingLink) location.replace("/link");
+
+if (me && !me.lineLogin) {
+  document.getElementById("lineLink").hidden = true;
+  document.getElementById("lineOff").hidden = false;
+}
+if (me?.devLogin) document.getElementById("devBox").hidden = false;
+
+document.getElementById("devForm")?.addEventListener("submit", async (e) => {
+  e.preventDefault();
+  const box = document.getElementById("errBox");
+  box.hidden = true;
+  try {
+    await api.post("/auth/dev-login", { emp_code: document.getElementById("empCode").value.trim() });
+    location.href = "/";
+  } catch (error) {
+    box.textContent = error.message;
+    box.hidden = false;
+  }
+});
+</script>
+</body>
+</html>

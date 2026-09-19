@@ -1,0 +1,72 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="color-scheme" content="dark">
+<title>ผูกรหัสพนักงาน — ระบบเฝ้าระวังน้ำ</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Barlow+Semi+Condensed:wght@400;500;600&family=Noto+Sans+Thai:wght@400;500;600&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="/css/app.css">
+</head>
+<body>
+<div class="center-page">
+  <div class="auth-card">
+    <h1>ผูกรหัสพนักงาน</h1>
+    <div class="sub" id="greeting">เข้าสู่ระบบด้วย LINE สำเร็จแล้ว ขั้นตอนสุดท้ายคือผูกกับรหัสพนักงานของคุณ</div>
+
+    <div id="errBox" class="banner err" hidden></div>
+
+    <form id="linkForm">
+      <div class="field">
+        <label for="empCode">รหัสพนักงาน 7 หลัก</label>
+        <input id="empCode" inputmode="numeric" pattern="\d{7}" maxlength="7"
+               placeholder="0013649" autocomplete="off" required autofocus>
+      </div>
+      <button class="primary" type="submit" style="width:100%;padding:10px">ผูกบัญชี</button>
+    </form>
+
+    <div class="banner" style="margin:18px 0 0;border-color:var(--line);background:transparent">
+      <div class="grow" style="color:var(--mute);font-size:12.5px">
+        บัญชี LINE หนึ่งบัญชีผูกได้กับรหัสพนักงานเดียวเท่านั้น และผูกได้ครั้งเดียว
+        หากต้องเปลี่ยนบัญชี LINE ให้ผู้ดูแลระบบยกเลิกการผูกให้ก่อน
+      </div>
+    </div>
+
+    <div style="margin-top:14px;text-align:center">
+      <button id="logoutBtn" class="sm">ออกจากระบบ</button>
+    </div>
+  </div>
+</div>
+
+<script type="module">
+import { api } from "/js/api.js";
+
+const me = await api.get("/api/me").catch(() => null);
+if (me?.authenticated) location.replace("/");
+else if (!me?.pendingLink) location.replace("/login");
+
+document.getElementById("linkForm").addEventListener("submit", async (e) => {
+  e.preventDefault();
+  const box = document.getElementById("errBox");
+  const btn = e.target.querySelector("button");
+  box.hidden = true;
+  btn.disabled = true;
+  try {
+    await api.post("/auth/link-employee", { emp_code: document.getElementById("empCode").value.trim() });
+    location.href = "/";
+  } catch (error) {
+    box.textContent = error.message;
+    box.hidden = false;
+    btn.disabled = false;
+  }
+});
+
+document.getElementById("logoutBtn").addEventListener("click", async () => {
+  await api.post("/auth/logout").catch(() => {});
+  location.href = "/login";
+});
+</script>
+</body>
+</html>

@@ -1,0 +1,16 @@
+{
+  "name": "tank600q-modbus-mongo-bridge",
+  "version": "1.0.0",
+  "description": "อ่านค่า AI1 (ระดับน้ำ 600Q) และ AI2 (Flowrate 600Q) จาก PLC ผ่าน Modbus TCP แล้วส่งเข้า MongoDB Atlas โดยตรง — รันแยกบน Raspberry Pi อีกตัวที่หน้างานบ่อ 600Q ไม่มีหน้าเว็บ",
+  "type": "module",
+  "private": true,
+  "engines": {
+    "node": ">=18"
+  },
+  "scripts": {
+    "start": "node index.js"
+  },
+  "dependencies": {
+    "mongodb": "^7.6.0"
+  }
+}

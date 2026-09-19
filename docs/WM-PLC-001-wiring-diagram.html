@@ -1,0 +1,661 @@
+<!doctype html>
+<html>
+<head>
+<meta charset="utf-8">
+<title>WM-PLC-001 Rev C Wiring Diagram</title>
+<style>
+  @page { size: A3 landscape; margin: 0; }
+  * { box-sizing: border-box; }
+  html, body { margin:0; padding:0; background:#fff; }
+  body { font-family: Arial, Helvetica, sans-serif; color:#111; }
+  .mono { font-family: "Courier New", Courier, monospace; }
+
+  .sheet {
+    width: 420mm;
+    height: 297mm;
+    padding: 8mm;
+    position: relative;
+    page-break-after: always;
+    overflow: hidden;
+  }
+  .sheet:last-child { page-break-after: auto; }
+
+  .frame { position:absolute; inset:8mm; border: 0.6mm solid #111; }
+
+  .titleblock {
+    position:absolute; right:8mm; bottom:8mm;
+    width:150mm; height:34mm;
+    border:0.5mm solid #111;
+    display:grid;
+    grid-template-columns: 1fr 1fr;
+    grid-template-rows: auto 1fr auto;
+    font-size:9px;
+  }
+  .tb-title-row { grid-column:1/3; border-bottom:0.35mm solid #111; padding:2mm 3mm; }
+  .tb-title-row .t1 { font-size:12px; font-weight:bold; letter-spacing:0.02em; }
+  .tb-title-row .t2 { font-size:8.5px; color:#333; margin-top:1mm; }
+  .tb-cell { border-right:0.35mm solid #111; border-bottom:0.35mm solid #111; padding:1.6mm 3mm; }
+  .tb-cell:nth-child(4) { border-right:none; }
+  .tb-cell b { display:block; font-size:7px; letter-spacing:.06em; color:#555; text-transform:uppercase; }
+  .tb-cell span.val { font-family:"Courier New",monospace; font-size:10px; }
+
+  h1.pagehead { font-size:16px; margin:0 0 2mm; letter-spacing:.02em; }
+  p.pagesub { font-size:10px; color:#333; margin:0 0 6mm; max-width:230mm; }
+
+  .legend { position:absolute; top:8mm; right:8mm; width:118mm; font-size:8px; border:0.35mm solid #111; padding:2.5mm 3mm; }
+  .legend b { display:block; font-size:8.5px; margin-bottom:1.5mm; }
+  .legend .row { display:flex; align-items:center; gap:2mm; margin-bottom:0.8mm; }
+  .legend .sw { width:9mm; height:1.4mm; display:inline-block; }
+
+  table.wlist, table.tterm { border-collapse:collapse; width:100%; font-size:9.2px; }
+  table.wlist th, table.wlist td, table.tterm th, table.tterm td {
+    border:0.3mm solid #333; padding:1.3mm 2.2mm; text-align:left; vertical-align:top;
+  }
+  table.wlist th, table.tterm th { background:#eee; font-size:8.2px; text-transform:uppercase; letter-spacing:.03em; }
+  table.wlist td.mono, table.tterm td.mono { font-family:"Courier New",monospace; white-space:nowrap; }
+  .colorchip { display:inline-block; width:8mm; height:3mm; border:0.25mm solid #333; vertical-align:middle; margin-right:1.5mm; }
+
+  .note-box { border:0.35mm solid #111; padding:3mm 4mm; font-size:9px; margin-top:4mm; }
+  .note-box b { display:block; font-size:9.5px; margin-bottom:1.5mm; }
+  .note-box ul { margin:0; padding-left:4mm; }
+  .note-box li { margin-bottom:1mm; }
+
+  .sec-title { font-size:11px; font-weight:bold; margin:4mm 0 2mm; border-bottom:0.35mm solid #111; padding-bottom:1mm; }
+  .twocol { display:grid; grid-template-columns:1fr 1fr; gap:0 8mm; }
+</style>
+</head>
+<body>
+
+<!-- ============ SHEET 1 : ARCHITECTURE / POWER + AM2 x4 + ETHERNET ============ -->
+<div class="sheet">
+  <div class="frame"></div>
+  <div style="position:absolute;left:11mm;top:8mm;">
+    <h1 class="pagehead">WATER MONITORING — PLC WIRING DIAGRAM REV.C (แผ่นที่ 1: สถาปัตยกรรมตู้)</h1>
+    <p class="pagesub">อัปเดตตามค่าที่ตั้งไว้จริงในระบบ (หน้าจุดวัด) ณ วันที่ 2026-09-13 — รวม LOGO! AM2 6 ตัว, 11 ช่องสัญญาณ I1–I11 (I12 สำรอง) รองรับจุดวัดทั้งหมด 11 จุด — สายสัญญาณของแต่ละเซนเซอร์ดูรายละเอียดที่แผ่น 2</p>
+  </div>
+
+  <div class="legend">
+    <b>สายและสัญลักษณ์ (LEGEND)</b>
+    <div class="row"><span class="sw" style="background:#8B5A2B"></span>AC Line (L) — น้ำตาล, 1.5mm²</div>
+    <div class="row"><span class="sw" style="background:#2255AA"></span>AC Neutral (N) — ฟ้า, 1.5mm²</div>
+    <div class="row"><span class="sw" style="background:#2F9E44"></span>PE / Ground — เขียว-เหลือง, 1.5mm²</div>
+    <div class="row"><span class="sw" style="background:#C0392B"></span>DC 24V+ — แดง, 1.0mm²</div>
+    <div class="row"><span class="sw" style="background:#111"></span>DC 0V (common) — ดำ, 1.0mm²</div>
+    <div class="row"><span class="sw" style="background:#999"></span>Ethernet patch cord (UTP)</div>
+    <div class="row" style="margin-top:1.5mm;">เส้นวงกลมเปิดปลายสาย (○) = จุดต่อเนื่องไปแผ่นที่ 2</div>
+  </div>
+
+  <svg viewBox="0 0 404 281" width="404mm" height="281mm" style="position:absolute;left:8mm;top:8mm;" font-family="Arial">
+    <defs>
+      <marker id="arrow2" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse">
+        <polygon points="0,0 10,5 0,10" fill="currentColor"/>
+      </marker>
+    </defs>
+
+    <!-- ===== AC infeed chain ===== -->
+    <g stroke="#111" stroke-width="0.6" fill="none">
+      <rect x="15" y="48" width="26" height="55"/>
+      <rect x="58" y="48" width="30" height="55"/>
+      <rect x="105" y="43" width="46" height="65"/>
+    </g>
+    <g font-size="7.5" font-weight="bold" text-anchor="middle">
+      <text x="28" y="45">TB0</text>
+      <text x="73" y="45">Q1</text>
+      <text x="128" y="41">G1</text>
+    </g>
+    <g font-size="6" fill="#333" text-anchor="middle">
+      <text x="28" y="112">จุดต่อไฟเข้า (ลูกค้า)</text>
+      <text x="73" y="112">MCB 2P, 16A</text>
+      <text x="128" y="117">PSU 220VAC→24VDC, 5A</text>
+    </g>
+
+    <g font-size="6.2" class="mono">
+      <circle cx="41" cy="58" r="1.1" fill="#111"/><text x="38" y="55.5" text-anchor="end">1·L</text>
+      <circle cx="41" cy="73" r="1.1" fill="#111"/><text x="38" y="70.5" text-anchor="end">2·N</text>
+      <circle cx="41" cy="88" r="1.1" fill="#111"/><text x="38" y="85.5" text-anchor="end">3·PE</text>
+      <circle cx="58" cy="58" r="1.1" fill="#111"/>
+      <circle cx="58" cy="73" r="1.1" fill="#111"/>
+      <circle cx="88" cy="58" r="1.1" fill="#111"/><text x="84" y="55.5" text-anchor="end">3</text>
+      <circle cx="88" cy="73" r="1.1" fill="#111"/><text x="84" y="70.5" text-anchor="end">4</text>
+      <circle cx="105" cy="58" r="1.1" fill="#111"/><text x="109" y="55.5">L</text>
+      <circle cx="105" cy="73" r="1.1" fill="#111"/><text x="109" y="70.5">N</text>
+      <circle cx="105" cy="88" r="1.1" fill="#111"/><text x="109" y="85.5">PE</text>
+      <circle cx="151" cy="58" r="1.1" fill="#111"/><text x="147" y="55.5" text-anchor="end">+V</text>
+      <circle cx="151" cy="73" r="1.1" fill="#111"/><text x="147" y="70.5" text-anchor="end">-V</text>
+    </g>
+
+    <g stroke-width="0.7" fill="none">
+      <line x1="41" y1="58" x2="58" y2="58" stroke="#8B5A2B"/>
+      <line x1="41" y1="73" x2="58" y2="73" stroke="#2255AA"/>
+      <line x1="88" y1="58" x2="105" y2="58" stroke="#8B5A2B"/>
+      <line x1="88" y1="73" x2="105" y2="73" stroke="#2255AA"/>
+    </g>
+    <g font-size="6" fill="#900" text-anchor="middle">
+      <text x="49" y="54">W1</text><text x="49" y="79">W2</text>
+      <text x="96" y="54">W3</text><text x="96" y="79">W4</text>
+    </g>
+
+    <!-- PE: TB0 -> G1 -->
+    <path d="M41 88 V118 H105 V88" stroke="#2F9E44" stroke-width="0.7" stroke-dasharray="3 1.5" fill="none"/>
+    <text x="70" y="115" font-size="6" fill="#900" text-anchor="middle">W5</text>
+
+    <!-- 24V+ / 0V bus feeding row A (A1) and row B (AM2 x4) -->
+    <line x1="15" y1="140" x2="391" y2="140" stroke="#C0392B" stroke-width="1"/>
+    <line x1="15" y1="150" x2="391" y2="150" stroke="#111" stroke-width="1"/>
+    <text x="355" y="136" font-size="6" fill="#C0392B">24V+ BUS</text>
+    <text x="355" y="159" font-size="6" fill="#111">0V BUS</text>
+
+    <path d="M151 58 H190 V140" stroke="#C0392B" stroke-width="0.7" fill="none"/>
+    <text x="168" y="80" font-size="6" fill="#900">W7</text>
+    <path d="M151 73 H203 V150" stroke="#111" stroke-width="0.7" fill="none"/>
+    <text x="180" y="100" font-size="6" fill="#900">W8</text>
+
+    <!-- ===== Row A: A1 (LOGO!) + SW1 ===== -->
+    <rect x="185" y="95" width="50" height="35" stroke="#111" stroke-width="0.6" fill="none"/>
+    <text x="210" y="92" text-anchor="middle" font-size="7.5" font-weight="bold">A1 — LOGO! base</text>
+    <g class="mono" font-size="6">
+      <circle cx="198" cy="130" r="1.1"/><text x="198" y="135" text-anchor="middle">L+</text>
+      <circle cx="213" cy="130" r="1.1"/><text x="213" y="135" text-anchor="middle">M</text>
+      <circle cx="235" cy="112" r="1.1"/><text x="231" y="109.5" text-anchor="end">X1</text>
+    </g>
+
+    <rect x="250" y="95" width="30" height="28" stroke="#111" stroke-width="0.6" fill="none"/>
+    <text x="265" y="92" text-anchor="middle" font-size="7.5" font-weight="bold">SW1</text>
+    <text x="265" y="130" text-anchor="middle" font-size="5.6" fill="#333">Ethernet switch (ในตู้)</text>
+    <g class="mono" font-size="6">
+      <circle cx="250" cy="109" r="1.1"/><text x="254" y="106">P1</text>
+      <circle cx="280" cy="109" r="1.1"/><text x="276" y="106" text-anchor="end">P2</text>
+    </g>
+    <path d="M235 112 H242 V109 H250" stroke="#999" stroke-width="0.7" stroke-dasharray="1.5 1" fill="none"/>
+    <text x="238" y="102" font-size="6" fill="#900">W15</text>
+    <path d="M280 109 H305" stroke="#999" stroke-width="0.7" stroke-dasharray="1.5 1" fill="none"/>
+    <polygon points="305,109 300,106.5 300,111.5" fill="#111"/>
+    <text x="283" y="106" font-size="6" fill="#900">W16</text>
+    <text x="307" y="106.5" font-size="5.6" fill="#333">→ Site LAN /</text>
+    <text x="307" y="112.5" font-size="5.6" fill="#333">Server (นอกตู้)</text>
+
+    <path d="M198 130 V140" stroke="#C0392B" stroke-width="0.7" fill="none"/>
+    <text x="188" y="127" font-size="6" fill="#900">W9</text>
+    <path d="M213 130 V150" stroke="#111" stroke-width="0.7" fill="none"/>
+    <text x="219" y="127" font-size="6" fill="#900">W10</text>
+
+    <!-- ===== Row B: AM2-1..6 ===== -->
+    <g stroke="#111" stroke-width="0.6" fill="none">
+      <rect x="15" y="165" width="42" height="40"/>
+      <rect x="65" y="165" width="42" height="40"/>
+      <rect x="115" y="165" width="42" height="40"/>
+      <rect x="165" y="165" width="42" height="40"/>
+      <rect x="215" y="165" width="42" height="40"/>
+      <rect x="265" y="165" width="42" height="40"/>
+    </g>
+    <g font-size="6.5" font-weight="bold" text-anchor="middle">
+      <text x="36" y="161">AM2-1</text>
+      <text x="86" y="161">AM2-2</text>
+      <text x="136" y="161">AM2-3</text>
+      <text x="186" y="161">AM2-4</text>
+      <text x="236" y="161">AM2-5</text>
+      <text x="286" y="161">AM2-6</text>
+    </g>
+
+    <g class="mono" font-size="5.4">
+      <!-- AM2-1 -->
+      <circle cx="24" cy="165" r="1.1"/><text x="24" y="174" text-anchor="middle">L+</text>
+      <circle cx="45" cy="165" r="1.1"/><text x="45" y="174" text-anchor="middle">M</text>
+      <circle cx="23" cy="205" r="1.1"/><text x="23" y="202" text-anchor="middle">I1</text>
+      <circle cx="46" cy="205" r="1.1"/><text x="46" y="202" text-anchor="middle">I2</text>
+      <!-- AM2-2 -->
+      <circle cx="74" cy="165" r="1.1"/><text x="74" y="174" text-anchor="middle">L+</text>
+      <circle cx="95" cy="165" r="1.1"/><text x="95" y="174" text-anchor="middle">M</text>
+      <circle cx="73" cy="205" r="1.1"/><text x="73" y="202" text-anchor="middle">I3</text>
+      <circle cx="96" cy="205" r="1.1"/><text x="96" y="202" text-anchor="middle">I4</text>
+      <!-- AM2-3 -->
+      <circle cx="124" cy="165" r="1.1"/><text x="124" y="174" text-anchor="middle">L+</text>
+      <circle cx="145" cy="165" r="1.1"/><text x="145" y="174" text-anchor="middle">M</text>
+      <circle cx="123" cy="205" r="1.1"/><text x="123" y="202" text-anchor="middle">I5</text>
+      <circle cx="146" cy="205" r="1.1"/><text x="146" y="202" text-anchor="middle">I6</text>
+      <!-- AM2-4 -->
+      <circle cx="174" cy="165" r="1.1"/><text x="174" y="174" text-anchor="middle">L+</text>
+      <circle cx="195" cy="165" r="1.1"/><text x="195" y="174" text-anchor="middle">M</text>
+      <circle cx="173" cy="205" r="1.1"/><text x="173" y="202" text-anchor="middle">I7</text>
+      <circle cx="196" cy="205" r="1.1"/><text x="196" y="202" text-anchor="middle">I8</text>
+      <!-- AM2-5 -->
+      <circle cx="224" cy="165" r="1.1"/><text x="224" y="174" text-anchor="middle">L+</text>
+      <circle cx="245" cy="165" r="1.1"/><text x="245" y="174" text-anchor="middle">M</text>
+      <circle cx="223" cy="205" r="1.1"/><text x="223" y="202" text-anchor="middle">I9</text>
+      <circle cx="246" cy="205" r="1.1"/><text x="246" y="202" text-anchor="middle">I10</text>
+      <!-- AM2-6 -->
+      <circle cx="274" cy="165" r="1.1"/><text x="274" y="174" text-anchor="middle">L+</text>
+      <circle cx="295" cy="165" r="1.1"/><text x="295" y="174" text-anchor="middle">M</text>
+      <circle cx="273" cy="205" r="1.1"/><text x="273" y="202" text-anchor="middle">I11</text>
+    </g>
+    <text x="296" y="202" font-size="4.8" fill="#333" text-anchor="middle">I12</text>
+
+    <!-- power drops row B -->
+    <g stroke-width="0.7" fill="none">
+      <path d="M24 140 V165" stroke="#C0392B"/>
+      <path d="M45 150 V165" stroke="#111"/>
+      <path d="M74 140 V165" stroke="#C0392B"/>
+      <path d="M95 150 V165" stroke="#111"/>
+      <path d="M124 140 V165" stroke="#C0392B"/>
+      <path d="M145 150 V165" stroke="#111"/>
+      <path d="M174 140 V165" stroke="#C0392B"/>
+      <path d="M195 150 V165" stroke="#111"/>
+      <path d="M224 140 V165" stroke="#C0392B"/>
+      <path d="M245 150 V165" stroke="#111"/>
+      <path d="M274 140 V165" stroke="#C0392B"/>
+      <path d="M295 150 V165" stroke="#111"/>
+    </g>
+    <g font-size="5" fill="#900">
+      <text x="14" y="155">W11</text><text x="45" y="159">W12</text>
+      <text x="64" y="155">W13</text><text x="95" y="159">W14</text>
+      <text x="114" y="155">W17</text><text x="145" y="159">W18</text>
+      <text x="164" y="155">W19</text><text x="195" y="159">W20</text>
+      <text x="214" y="155">W41</text><text x="245" y="159">W42</text>
+      <text x="264" y="155">W43</text><text x="295" y="159">W44</text>
+    </g>
+
+    <!-- channel stubs to sheet 2, routed downward below each module (own column, no inter-module crowding) -->
+    <g stroke="#555" stroke-width="0.6" stroke-dasharray="2 1.2" fill="none">
+      <path d="M23 205 V214"/><path d="M46 205 V225"/>
+      <path d="M73 205 V214"/><path d="M96 205 V225"/>
+      <path d="M123 205 V214"/><path d="M146 205 V225"/>
+      <path d="M173 205 V214"/><path d="M196 205 V225"/>
+      <path d="M223 205 V214"/><path d="M246 205 V225"/>
+      <path d="M273 205 V214"/>
+    </g>
+    <g stroke="#555" fill="#fff" stroke-width="0.6">
+      <circle cx="23" cy="214" r="1.3"/><circle cx="46" cy="225" r="1.3"/>
+      <circle cx="73" cy="214" r="1.3"/><circle cx="96" cy="225" r="1.3"/>
+      <circle cx="123" cy="214" r="1.3"/><circle cx="146" cy="225" r="1.3"/>
+      <circle cx="173" cy="214" r="1.3"/><circle cx="196" cy="225" r="1.3"/>
+      <circle cx="223" cy="214" r="1.3"/><circle cx="246" cy="225" r="1.3"/>
+      <circle cx="273" cy="214" r="1.3"/>
+    </g>
+    <g font-size="4.7" fill="#333">
+      <text x="10" y="221">→ LT-600Q</text>
+      <text x="10" y="232">→ LT-1A</text>
+      <text x="60" y="221">→ LT-1B</text>
+      <text x="60" y="232">→ LT-2</text>
+      <text x="110" y="221">→ LT-3</text>
+      <text x="110" y="232">→ LT-4</text>
+      <text x="160" y="221">→ LT-5</text>
+      <text x="160" y="232">→ TT-05</text>
+      <text x="210" y="221">→ FT-600Q</text>
+      <text x="210" y="232">→ PT-AIR</text>
+      <text x="260" y="221">→ PT-STM</text>
+      <text x="260" y="232" fill="#666">I12 สำรอง</text>
+    </g>
+    <text x="36" y="242" text-anchor="middle" font-size="5" font-family="Courier New" fill="#333">addr 0/1</text>
+    <text x="86" y="242" text-anchor="middle" font-size="5" font-family="Courier New" fill="#333">addr 2/3</text>
+    <text x="136" y="242" text-anchor="middle" font-size="5" font-family="Courier New" fill="#333">addr 4/5</text>
+    <text x="186" y="242" text-anchor="middle" font-size="5" font-family="Courier New" fill="#333">addr 6/7</text>
+    <text x="236" y="242" text-anchor="middle" font-size="5" font-family="Courier New" fill="#333">addr 8/9</text>
+    <text x="286" y="242" text-anchor="middle" font-size="5" font-family="Courier New" fill="#333">addr 10</text>
+  </svg>
+
+  <div class="titleblock">
+    <div class="tb-title-row">
+      <div class="t1">WATER MONITORING — PLC WIRING DIAGRAM</div>
+      <div class="t2">Architecture — Power / LOGO! / AM2×6 / Ethernet</div>
+    </div>
+    <div class="tb-cell"><b>Doc No.</b><span class="val">WM-PLC-001</span></div>
+    <div class="tb-cell"><b>Rev.</b><span class="val">C</span></div>
+    <div class="tb-cell"><b>Scale</b><span class="val">NTS</span></div>
+    <div class="tb-cell"><b>Sheet</b><span class="val">1 OF 4</span></div>
+    <div class="tb-cell"><b>Date</b><span class="val">2026-09-13</span></div>
+    <div class="tb-cell"><b>Size</b><span class="val">A3</span></div>
+    <div class="tb-cell"><b>Drawn</b><span class="val">—</span></div>
+    <div class="tb-cell"><b>Checked</b><span class="val">— (ตรวจก่อนใช้จริง)</span></div>
+  </div>
+</div>
+
+<!-- ============ SHEET 2 : SENSOR FIELD WIRING (11x) ============ -->
+<div class="sheet">
+  <div class="frame"></div>
+  <div style="position:absolute;left:11mm;top:8mm;">
+    <h1 class="pagehead">การต่อสายเซนเซอร์ภาคสนาม (แผ่นที่ 2: 11 จุดวัด)</h1>
+    <p class="pagesub">เซนเซอร์ 3 สาย (2 สายไฟเลี้ยง L+/M + 1 สายสัญญาณอนาล็อกสีขาว) ทุกจุด — <b>ยืนยันแล้วว่าทุกจุดเป็นสัญญาณกระแส 4-20mA</b>: จุดวัดระดับน้ำทั้ง 7 บ่อ (LT-600Q, LT-1A, LT-1B, LT-2, LT-3, LT-4, LT-5) ใช้เซนเซอร์ <b>Keyence LR-X250 รุ่นเดียวกันทั้งหมด</b>; TT-05/FT-600Q/PT-AIR/PT-STM เป็นทรานสมิตเตอร์ analog 4-20mA ทั่วไป (คนละยี่ห้อ/รุ่นตามชนิดวัด) — <b>ตั้งทุกช่อง AM2 เป็นโหมดกระแส (4-20mA) ไม่ใช่แรงดัน</b></p>
+  </div>
+
+  <svg viewBox="0 0 404 281" width="404mm" height="281mm" style="position:absolute;left:8mm;top:8mm;" font-family="Arial">
+    <text x="15" y="22" font-size="6" fill="#333">แถวที่ 1 และแถวที่ 2 ต่อ 24V+ / 0V จากบัสเดียวกันบนแผ่นที่ 1 (แยกวาดเป็นสองแถวเพื่อความชัดเจน)</text>
+
+    <!-- ===== ROW 1 : 6 sensors ===== -->
+    <line x1="15" y1="35" x2="300" y2="35" stroke="#C0392B" stroke-width="1"/>
+    <line x1="15" y1="45" x2="300" y2="45" stroke="#111" stroke-width="1"/>
+    <text x="304" y="38" font-size="6" fill="#C0392B">24V+</text>
+    <text x="304" y="48" font-size="6" fill="#111">0V</text>
+
+    <g font-family="Arial" font-size="5.6">
+      <!-- cell: LT-600Q -->
+      <g>
+        <text x="22" y="80" font-size="3.8" fill="#777">BT1</text><text x="35" y="61" text-anchor="middle" font-size="6" font-weight="bold">LT-600Q</text>
+        <text x="35" y="70" text-anchor="middle" font-size="4.6" fill="#333">บ่อ 600Q</text>
+        <rect x="20" y="76" width="26" height="36" stroke="#111" stroke-width="0.6" fill="none"/>
+        <g class="mono" font-size="5.2">
+          <circle cx="20" cy="86" r="1"/><text x="16" y="88" text-anchor="end">L+</text>
+          <circle cx="20" cy="99" r="1"/><text x="16" y="101" text-anchor="end">M</text>
+          <circle cx="20" cy="112" r="1"/><text x="16" y="114" text-anchor="end">OUT</text>
+        </g>
+        <path d="M20 86 V35" stroke="#C0392B" stroke-width="0.6" fill="none"/>
+        <path d="M27 99 V45 H35" stroke="#111" stroke-width="0.6" fill="none"/>
+        <path d="M20 112 H8 V125 H38" stroke="#555" stroke-width="0.6" stroke-dasharray="2 1.2" fill="none"/>
+        <text x="35" y="133" text-anchor="middle" font-size="4.8" fill="#900">W21/22/23</text>
+        <text x="35" y="141" text-anchor="middle" font-size="5" fill="#333">→ AM2-1:I1</text>
+        <text x="35" y="147" text-anchor="middle" font-size="5" fill="#333">addr 0 · ยืนยันแล้ว</text>
+      </g>
+      <!-- cell: LT-1A -->
+      <g transform="translate(45,0)">
+        <text x="22" y="80" font-size="3.8" fill="#777">BT2</text><text x="35" y="61" text-anchor="middle" font-size="6" font-weight="bold">LT-1A</text>
+        <text x="35" y="70" text-anchor="middle" font-size="4.6" fill="#333">บ่อ 1A</text>
+        <rect x="20" y="76" width="26" height="36" stroke="#111" stroke-width="0.6" fill="none"/>
+        <g class="mono" font-size="5.2">
+          <circle cx="20" cy="86" r="1"/><text x="16" y="88" text-anchor="end">L+</text>
+          <circle cx="20" cy="99" r="1"/><text x="16" y="101" text-anchor="end">M</text>
+          <circle cx="20" cy="112" r="1"/><text x="16" y="114" text-anchor="end">OUT</text>
+        </g>
+        <path d="M20 86 V35" stroke="#C0392B" stroke-width="0.6" fill="none"/>
+        <path d="M27 99 V45 H35" stroke="#111" stroke-width="0.6" fill="none"/>
+        <path d="M20 112 H8 V125 H38" stroke="#555" stroke-width="0.6" stroke-dasharray="2 1.2" fill="none"/>
+        <text x="35" y="133" text-anchor="middle" font-size="4.8" fill="#900">W24/25/26</text>
+        <text x="35" y="141" text-anchor="middle" font-size="5" fill="#333">→ AM2-1:I2</text>
+        <text x="35" y="147" text-anchor="middle" font-size="5" fill="#333">addr 1 · รอทดสอบ</text>
+      </g>
+      <!-- cell: LT-1B -->
+      <g transform="translate(90,0)">
+        <text x="22" y="80" font-size="3.8" fill="#777">BT3</text><text x="35" y="61" text-anchor="middle" font-size="6" font-weight="bold">LT-1B</text>
+        <text x="35" y="70" text-anchor="middle" font-size="4.6" fill="#333">บ่อ 1B</text>
+        <rect x="20" y="76" width="26" height="36" stroke="#111" stroke-width="0.6" fill="none"/>
+        <g class="mono" font-size="5.2">
+          <circle cx="20" cy="86" r="1"/><text x="16" y="88" text-anchor="end">L+</text>
+          <circle cx="20" cy="99" r="1"/><text x="16" y="101" text-anchor="end">M</text>
+          <circle cx="20" cy="112" r="1"/><text x="16" y="114" text-anchor="end">OUT</text>
+        </g>
+        <path d="M20 86 V35" stroke="#C0392B" stroke-width="0.6" fill="none"/>
+        <path d="M27 99 V45 H35" stroke="#111" stroke-width="0.6" fill="none"/>
+        <path d="M20 112 H8 V125 H38" stroke="#555" stroke-width="0.6" stroke-dasharray="2 1.2" fill="none"/>
+        <text x="35" y="133" text-anchor="middle" font-size="4.8" fill="#900">W27/28/29</text>
+        <text x="35" y="141" text-anchor="middle" font-size="5" fill="#333">→ AM2-2:I3</text>
+        <text x="35" y="147" text-anchor="middle" font-size="5" fill="#333">addr 2 · รอทดสอบ</text>
+      </g>
+      <!-- cell: LT-2 -->
+      <g transform="translate(135,0)">
+        <text x="22" y="80" font-size="3.8" fill="#777">BT4</text><text x="35" y="61" text-anchor="middle" font-size="6" font-weight="bold">LT-2</text>
+        <text x="35" y="70" text-anchor="middle" font-size="4.6" fill="#333">บ่อ 2</text>
+        <rect x="20" y="76" width="26" height="36" stroke="#111" stroke-width="0.6" fill="none"/>
+        <g class="mono" font-size="5.2">
+          <circle cx="20" cy="86" r="1"/><text x="16" y="88" text-anchor="end">L+</text>
+          <circle cx="20" cy="99" r="1"/><text x="16" y="101" text-anchor="end">M</text>
+          <circle cx="20" cy="112" r="1"/><text x="16" y="114" text-anchor="end">OUT</text>
+        </g>
+        <path d="M20 86 V35" stroke="#C0392B" stroke-width="0.6" fill="none"/>
+        <path d="M27 99 V45 H35" stroke="#111" stroke-width="0.6" fill="none"/>
+        <path d="M20 112 H8 V125 H38" stroke="#555" stroke-width="0.6" stroke-dasharray="2 1.2" fill="none"/>
+        <text x="35" y="133" text-anchor="middle" font-size="4.8" fill="#900">W30/31/32</text>
+        <text x="35" y="141" text-anchor="middle" font-size="5" fill="#333">→ AM2-2:I4</text>
+        <text x="35" y="147" text-anchor="middle" font-size="5" fill="#333">addr 3 · รอทดสอบ</text>
+      </g>
+      <!-- cell: LT-3 -->
+      <g transform="translate(180,0)">
+        <text x="22" y="80" font-size="3.8" fill="#777">BT5</text><text x="35" y="61" text-anchor="middle" font-size="6" font-weight="bold">LT-3</text>
+        <text x="35" y="70" text-anchor="middle" font-size="4.6" fill="#333">บ่อ 3</text>
+        <rect x="20" y="76" width="26" height="36" stroke="#111" stroke-width="0.6" fill="none"/>
+        <g class="mono" font-size="5.2">
+          <circle cx="20" cy="86" r="1"/><text x="16" y="88" text-anchor="end">L+</text>
+          <circle cx="20" cy="99" r="1"/><text x="16" y="101" text-anchor="end">M</text>
+          <circle cx="20" cy="112" r="1"/><text x="16" y="114" text-anchor="end">OUT</text>
+        </g>
+        <path d="M20 86 V35" stroke="#C0392B" stroke-width="0.6" fill="none"/>
+        <path d="M27 99 V45 H35" stroke="#111" stroke-width="0.6" fill="none"/>
+        <path d="M20 112 H8 V125 H38" stroke="#555" stroke-width="0.6" stroke-dasharray="2 1.2" fill="none"/>
+        <text x="35" y="133" text-anchor="middle" font-size="4.8" fill="#900">W33/34/35</text>
+        <text x="35" y="141" text-anchor="middle" font-size="5" fill="#333">→ AM2-3:I5</text>
+        <text x="35" y="147" text-anchor="middle" font-size="5" fill="#333">addr 4 · รอทดสอบ</text>
+      </g>
+      <!-- cell: LT-4 -->
+      <g transform="translate(225,0)">
+        <text x="22" y="80" font-size="3.8" fill="#777">BT6</text><text x="35" y="61" text-anchor="middle" font-size="6" font-weight="bold">LT-4</text>
+        <text x="35" y="70" text-anchor="middle" font-size="4.6" fill="#333">บ่อ 4</text>
+        <rect x="20" y="76" width="26" height="36" stroke="#111" stroke-width="0.6" fill="none"/>
+        <g class="mono" font-size="5.2">
+          <circle cx="20" cy="86" r="1"/><text x="16" y="88" text-anchor="end">L+</text>
+          <circle cx="20" cy="99" r="1"/><text x="16" y="101" text-anchor="end">M</text>
+          <circle cx="20" cy="112" r="1"/><text x="16" y="114" text-anchor="end">OUT</text>
+        </g>
+        <path d="M20 86 V35" stroke="#C0392B" stroke-width="0.6" fill="none"/>
+        <path d="M27 99 V45 H35" stroke="#111" stroke-width="0.6" fill="none"/>
+        <path d="M20 112 H8 V125 H38" stroke="#555" stroke-width="0.6" stroke-dasharray="2 1.2" fill="none"/>
+        <text x="35" y="133" text-anchor="middle" font-size="4.8" fill="#900">W36/37/38</text>
+        <text x="35" y="141" text-anchor="middle" font-size="5" fill="#333">→ AM2-3:I6</text>
+        <text x="35" y="147" text-anchor="middle" font-size="5" fill="#333">addr 5 · รอทดสอบ</text>
+      </g>
+    </g>
+
+    <!-- ===== ROW 2 : 5 sensors ===== -->
+    <line x1="15" y1="162" x2="255" y2="162" stroke="#C0392B" stroke-width="1"/>
+    <line x1="15" y1="172" x2="255" y2="172" stroke="#111" stroke-width="1"/>
+    <text x="259" y="165" font-size="6" fill="#C0392B">24V+</text>
+    <text x="259" y="175" font-size="6" fill="#111">0V</text>
+
+    <g font-family="Arial" font-size="5.6">
+      <!-- cell: LT-5 -->
+      <g transform="translate(0,127)">
+        <text x="22" y="80" font-size="3.8" fill="#777">BT7</text><text x="35" y="61" text-anchor="middle" font-size="6" font-weight="bold">LT-5</text>
+        <text x="35" y="70" text-anchor="middle" font-size="4.6" fill="#333">บ่อ 5</text>
+        <rect x="20" y="76" width="26" height="36" stroke="#111" stroke-width="0.6" fill="none"/>
+        <g class="mono" font-size="5.2">
+          <circle cx="20" cy="86" r="1"/><text x="16" y="88" text-anchor="end">L+</text>
+          <circle cx="20" cy="99" r="1"/><text x="16" y="101" text-anchor="end">M</text>
+          <circle cx="20" cy="112" r="1"/><text x="16" y="114" text-anchor="end">OUT</text>
+        </g>
+        <path d="M20 86 V35" stroke="#C0392B" stroke-width="0.6" fill="none"/>
+        <path d="M27 99 V45 H35" stroke="#111" stroke-width="0.6" fill="none"/>
+        <path d="M20 112 H8 V125 H38" stroke="#555" stroke-width="0.6" stroke-dasharray="2 1.2" fill="none"/>
+        <text x="35" y="133" text-anchor="middle" font-size="4.8" fill="#900">W39/40/41</text>
+        <text x="35" y="141" text-anchor="middle" font-size="5" fill="#333">→ AM2-4:I7</text>
+        <text x="35" y="147" text-anchor="middle" font-size="5" fill="#333">addr 6 · รอทดสอบ</text>
+      </g>
+      <!-- cell: TT-05 -->
+      <g transform="translate(45,127)">
+        <text x="22" y="80" font-size="3.8" fill="#777">BT8</text><text x="35" y="61" text-anchor="middle" font-size="6" font-weight="bold">TT-05</text>
+        <text x="35" y="70" text-anchor="middle" font-size="4.6" fill="#333">อุณหภูมิ บ่อ 5</text>
+        <rect x="20" y="76" width="26" height="36" stroke="#111" stroke-width="0.6" fill="none"/>
+        <g class="mono" font-size="5.2">
+          <circle cx="20" cy="86" r="1"/><text x="16" y="88" text-anchor="end">L+</text>
+          <circle cx="20" cy="99" r="1"/><text x="16" y="101" text-anchor="end">M</text>
+          <circle cx="20" cy="112" r="1"/><text x="16" y="114" text-anchor="end">OUT</text>
+        </g>
+        <path d="M20 86 V35" stroke="#C0392B" stroke-width="0.6" fill="none"/>
+        <path d="M27 99 V45 H35" stroke="#111" stroke-width="0.6" fill="none"/>
+        <path d="M20 112 H8 V125 H38" stroke="#555" stroke-width="0.6" stroke-dasharray="2 1.2" fill="none"/>
+        <text x="35" y="133" text-anchor="middle" font-size="4.8" fill="#900">W42/43/44</text>
+        <text x="35" y="141" text-anchor="middle" font-size="5" fill="#333">→ AM2-4:I8</text>
+        <text x="35" y="147" text-anchor="middle" font-size="5" fill="#333">addr 7 · รอทดสอบ</text>
+      </g>
+      <!-- cell: FT-600Q -->
+      <g transform="translate(90,127)">
+        <text x="22" y="80" font-size="3.8" fill="#777">BT9</text><text x="35" y="61" text-anchor="middle" font-size="6" font-weight="bold">FT-600Q</text>
+        <text x="35" y="70" text-anchor="middle" font-size="4.6" fill="#333">อัตราไหล บ่อ 600Q</text>
+        <rect x="20" y="76" width="26" height="36" stroke="#111" stroke-width="0.6" fill="none"/>
+        <g class="mono" font-size="5.2">
+          <circle cx="20" cy="86" r="1"/><text x="16" y="88" text-anchor="end">L+</text>
+          <circle cx="20" cy="99" r="1"/><text x="16" y="101" text-anchor="end">M</text>
+          <circle cx="20" cy="112" r="1"/><text x="16" y="114" text-anchor="end">OUT</text>
+        </g>
+        <path d="M20 86 V35" stroke="#C0392B" stroke-width="0.6" fill="none"/>
+        <path d="M27 99 V45 H35" stroke="#111" stroke-width="0.6" fill="none"/>
+        <path d="M20 112 H8 V125 H38" stroke="#555" stroke-width="0.6" stroke-dasharray="2 1.2" fill="none"/>
+        <text x="35" y="133" text-anchor="middle" font-size="4.8" fill="#900">W45/46/47</text>
+        <text x="35" y="141" text-anchor="middle" font-size="5" fill="#333">→ AM2-5:I9</text>
+        <text x="35" y="147" text-anchor="middle" font-size="5" fill="#333">addr 8 · รอทดสอบ</text>
+      </g>
+      <!-- cell: PT-AIR -->
+      <g transform="translate(135,127)">
+        <text x="22" y="80" font-size="3.8" fill="#777">BT10</text><text x="35" y="61" text-anchor="middle" font-size="6" font-weight="bold">PT-AIR</text>
+        <text x="35" y="70" text-anchor="middle" font-size="4.6" fill="#333">แรงดันลม</text>
+        <rect x="20" y="76" width="26" height="36" stroke="#111" stroke-width="0.6" fill="none"/>
+        <g class="mono" font-size="5.2">
+          <circle cx="20" cy="86" r="1"/><text x="16" y="88" text-anchor="end">L+</text>
+          <circle cx="20" cy="99" r="1"/><text x="16" y="101" text-anchor="end">M</text>
+          <circle cx="20" cy="112" r="1"/><text x="16" y="114" text-anchor="end">OUT</text>
+        </g>
+        <path d="M20 86 V35" stroke="#C0392B" stroke-width="0.6" fill="none"/>
+        <path d="M27 99 V45 H35" stroke="#111" stroke-width="0.6" fill="none"/>
+        <path d="M20 112 H8 V125 H38" stroke="#555" stroke-width="0.6" stroke-dasharray="2 1.2" fill="none"/>
+        <text x="35" y="133" text-anchor="middle" font-size="4.8" fill="#900">W48/49/50</text>
+        <text x="35" y="141" text-anchor="middle" font-size="5" fill="#333">→ AM2-5:I10</text>
+        <text x="35" y="147" text-anchor="middle" font-size="5" fill="#333">addr 9 · รอทดสอบ</text>
+      </g>
+      <!-- cell: PT-STM -->
+      <g transform="translate(180,127)">
+        <text x="22" y="80" font-size="3.8" fill="#777">BT11</text><text x="35" y="61" text-anchor="middle" font-size="6" font-weight="bold">PT-STM</text>
+        <text x="35" y="70" text-anchor="middle" font-size="4.6" fill="#333">แรงดันไอน้ำ</text>
+        <rect x="20" y="76" width="26" height="36" stroke="#111" stroke-width="0.6" fill="none"/>
+        <g class="mono" font-size="5.2">
+          <circle cx="20" cy="86" r="1"/><text x="16" y="88" text-anchor="end">L+</text>
+          <circle cx="20" cy="99" r="1"/><text x="16" y="101" text-anchor="end">M</text>
+          <circle cx="20" cy="112" r="1"/><text x="16" y="114" text-anchor="end">OUT</text>
+        </g>
+        <path d="M20 86 V35" stroke="#C0392B" stroke-width="0.6" fill="none"/>
+        <path d="M27 99 V45 H35" stroke="#111" stroke-width="0.6" fill="none"/>
+        <path d="M20 112 H8 V125 H38" stroke="#555" stroke-width="0.6" stroke-dasharray="2 1.2" fill="none"/>
+        <text x="35" y="133" text-anchor="middle" font-size="4.8" fill="#900">W51/52/53</text>
+        <text x="35" y="141" text-anchor="middle" font-size="5" fill="#333">→ AM2-6:I11</text>
+        <text x="35" y="147" text-anchor="middle" font-size="5" fill="#333">addr 10 · รอทดสอบ</text>
+      </g>
+    </g>
+
+  </svg>
+
+  <div class="titleblock">
+    <div class="tb-title-row">
+      <div class="t1">WATER MONITORING — PLC WIRING DIAGRAM</div>
+      <div class="t2">Sensor Field Wiring — 11 จุดวัด</div>
+    </div>
+    <div class="tb-cell"><b>Doc No.</b><span class="val">WM-PLC-001</span></div>
+    <div class="tb-cell"><b>Rev.</b><span class="val">C</span></div>
+    <div class="tb-cell"><b>Scale</b><span class="val">NTS</span></div>
+    <div class="tb-cell"><b>Sheet</b><span class="val">2 OF 4</span></div>
+    <div class="tb-cell"><b>Date</b><span class="val">2026-09-13</span></div>
+    <div class="tb-cell"><b>Size</b><span class="val">A3</span></div>
+    <div class="tb-cell"><b>Drawn</b><span class="val">—</span></div>
+    <div class="tb-cell"><b>Checked</b><span class="val">— (ตรวจก่อนใช้จริง)</span></div>
+  </div>
+</div>
+
+<!-- ============ SHEET 3 : WIRE LIST ============ -->
+<div class="sheet">
+  <div class="frame"></div>
+  <div style="position:absolute;left:11mm;top:8mm;right:8mm;">
+    <h1 class="pagehead">รายการสาย (WIRE LIST) — Rev.C ครบ 11 จุดวัด</h1>
+    <p class="pagesub">W1–W44 อยู่บนแผ่นที่ 1 (สายไฟเลี้ยง/Ethernet), W21–W53 อยู่บนแผ่นที่ 2 (สายเซนเซอร์ 11 ตัว × 3 เส้น)</p>
+
+    <table class="wlist">
+      <thead><tr><th style="width:22mm">Wire No.</th><th style="width:50mm">From</th><th style="width:50mm">To</th><th>หน้าที่ / สัญญาณ</th><th style="width:26mm">สาย</th><th style="width:18mm">ขนาด</th></tr></thead>
+      <tbody>
+        <tr><td class="mono">W1</td><td class="mono">TB0:1(L)</td><td class="mono">Q1:1</td><td>AC Line เข้า MCB</td><td><span class="colorchip" style="background:#8B5A2B"></span>น้ำตาล</td><td class="mono">1.5mm²</td></tr>
+        <tr><td class="mono">W2</td><td class="mono">TB0:2(N)</td><td class="mono">Q1:2</td><td>AC Neutral เข้า MCB</td><td><span class="colorchip" style="background:#2255AA"></span>ฟ้า</td><td class="mono">1.5mm²</td></tr>
+        <tr><td class="mono">W3</td><td class="mono">Q1:3</td><td class="mono">G1:L</td><td>AC Line → PSU</td><td><span class="colorchip" style="background:#8B5A2B"></span>น้ำตาล</td><td class="mono">1.5mm²</td></tr>
+        <tr><td class="mono">W4</td><td class="mono">Q1:4</td><td class="mono">G1:N</td><td>AC Neutral → PSU</td><td><span class="colorchip" style="background:#2255AA"></span>ฟ้า</td><td class="mono">1.5mm²</td></tr>
+        <tr><td class="mono">W5</td><td class="mono">TB0:3(PE)</td><td class="mono">G1:PE</td><td>กราวด์เข้า → chassis PSU</td><td><span class="colorchip" style="background:#2F9E44"></span>เขียว-เหลือง</td><td class="mono">1.5mm²</td></tr>
+        <tr><td class="mono">W7</td><td class="mono">G1:+V</td><td class="mono">24V+ BUS</td><td>24VDC+ (main)</td><td><span class="colorchip" style="background:#C0392B"></span>แดง</td><td class="mono">4mm²</td></tr>
+        <tr><td class="mono">W8</td><td class="mono">G1:-V</td><td class="mono">0V BUS</td><td>0V (main)</td><td><span class="colorchip" style="background:#111"></span>ดำ</td><td class="mono">4mm²</td></tr>
+        <tr><td class="mono">W9</td><td class="mono">24V+ BUS</td><td class="mono">A1:L+</td><td>ไฟเลี้ยง LOGO! base</td><td><span class="colorchip" style="background:#C0392B"></span>แดง</td><td class="mono">0.75mm²</td></tr>
+        <tr><td class="mono">W10</td><td class="mono">0V BUS</td><td class="mono">A1:M</td><td>0V → LOGO! base</td><td><span class="colorchip" style="background:#111"></span>ดำ</td><td class="mono">0.75mm²</td></tr>
+        <tr><td class="mono">W11–W44</td><td class="mono">24V+/0V BUS</td><td class="mono">AM2-1..6 : L+/M</td><td>ไฟเลี้ยงโมดูล AM2 ทั้ง 6 ตัว (คู่ละ L+/M — W11/12=AM2-1, W13/14=AM2-2, W17/18=AM2-3, W19/20=AM2-4, W41/42=AM2-5, W43/44=AM2-6)</td><td><span class="colorchip" style="background:#C0392B"></span>/<span class="colorchip" style="background:#111"></span></td><td class="mono">0.75mm²</td></tr>
+        <tr><td class="mono">W15</td><td class="mono">A1:X1</td><td class="mono">SW1:P1</td><td>Ethernet (LOGO! → switch ในตู้)</td><td><span class="colorchip" style="background:#999"></span>UTP</td><td class="mono">Cat5e/6</td></tr>
+        <tr><td class="mono">W16</td><td class="mono">SW1:P2</td><td class="mono">Site LAN/Server</td><td>Ethernet ออกนอกตู้</td><td><span class="colorchip" style="background:#999"></span>UTP</td><td class="mono">Cat5e/6</td></tr>
+        <tr><td class="mono">W21–23</td><td class="mono">BT1 (LT-600Q): L+/M/OUT</td><td class="mono">BUS / BUS / AM2-1:I1</td><td>เซนเซอร์ระดับน้ำ บ่อ 600Q (ยืนยันค่าจริงแล้ว)</td><td><span class="colorchip" style="background:#777"></span>shielded</td><td class="mono">0.5mm²</td></tr>
+        <tr><td class="mono">W24–26</td><td class="mono">BT2 (LT-1A): L+/M/OUT</td><td class="mono">BUS / BUS / AM2-1:I2</td><td>เซนเซอร์ระดับน้ำ บ่อ 1A</td><td><span class="colorchip" style="background:#777"></span>shielded</td><td class="mono">0.5mm²</td></tr>
+        <tr><td class="mono">W27–29</td><td class="mono">BT3 (LT-1B): L+/M/OUT</td><td class="mono">BUS / BUS / AM2-2:I3</td><td>เซนเซอร์ระดับน้ำ บ่อ 1B</td><td><span class="colorchip" style="background:#777"></span>shielded</td><td class="mono">0.5mm²</td></tr>
+        <tr><td class="mono">W30–32</td><td class="mono">BT4 (LT-2): L+/M/OUT</td><td class="mono">BUS / BUS / AM2-2:I4</td><td>เซนเซอร์ระดับน้ำ บ่อ 2</td><td><span class="colorchip" style="background:#777"></span>shielded</td><td class="mono">0.5mm²</td></tr>
+        <tr><td class="mono">W33–35</td><td class="mono">BT5 (LT-3): L+/M/OUT</td><td class="mono">BUS / BUS / AM2-3:I5</td><td>เซนเซอร์ระดับน้ำ บ่อ 3</td><td><span class="colorchip" style="background:#777"></span>shielded</td><td class="mono">0.5mm²</td></tr>
+        <tr><td class="mono">W36–38</td><td class="mono">BT6 (LT-4): L+/M/OUT</td><td class="mono">BUS / BUS / AM2-3:I6</td><td>เซนเซอร์ระดับน้ำ บ่อ 4</td><td><span class="colorchip" style="background:#777"></span>shielded</td><td class="mono">0.5mm²</td></tr>
+        <tr><td class="mono">W39–41</td><td class="mono">BT7 (LT-5): L+/M/OUT</td><td class="mono">BUS / BUS / AM2-4:I7</td><td>เซนเซอร์ระดับน้ำ บ่อ 5</td><td><span class="colorchip" style="background:#777"></span>shielded</td><td class="mono">0.5mm²</td></tr>
+        <tr><td class="mono">W42–44</td><td class="mono">BT8 (TT-05): L+/M/OUT</td><td class="mono">BUS / BUS / AM2-4:I8</td><td>เซนเซอร์อุณหภูมิ บ่อ 5</td><td><span class="colorchip" style="background:#777"></span>shielded</td><td class="mono">0.5mm²</td></tr>
+        <tr><td class="mono">W45–47</td><td class="mono">BT9 (FT-600Q): L+/M/OUT</td><td class="mono">BUS / BUS / AM2-5:I9</td><td>เซนเซอร์อัตราการไหล บ่อ 600Q</td><td><span class="colorchip" style="background:#777"></span>shielded</td><td class="mono">0.5mm²</td></tr>
+        <tr><td class="mono">W48–50</td><td class="mono">BT10 (PT-AIR): L+/M/OUT</td><td class="mono">BUS / BUS / AM2-5:I10</td><td>เซนเซอร์แรงดันลม</td><td><span class="colorchip" style="background:#777"></span>shielded</td><td class="mono">0.5mm²</td></tr>
+        <tr><td class="mono">W51–53</td><td class="mono">BT11 (PT-STM): L+/M/OUT</td><td class="mono">BUS / BUS / AM2-6:I11</td><td>เซนเซอร์แรงดันไอน้ำ</td><td><span class="colorchip" style="background:#777"></span>shielded</td><td class="mono">0.5mm²</td></tr>
+      </tbody>
+    </table>
+
+    <div class="note-box" style="margin-top:4mm;">
+      <b>หมายเหตุ</b>
+      <ul>
+        <li>W7/W8 (สายเมนจาก G1 เข้าบัส) ปรับขนาดเป็น 4mm² เพราะตอนนี้ต้องรับโหลดรวม 11 เซนเซอร์ + 6 AM2 + LOGO! base (เพิ่มจาก 2.5mm² เดิม) — ให้ผู้รับเหมาไฟฟ้าคำนวณกระแสจริงยืนยันอีกครั้ง</li>
+        <li>ขนาดสายอื่นเป็นค่าอ้างอิงทั่วไป ต้องตรวจสอบกับกระแสโหลดจริงเทียบกับพิกัด G1 (แนะนำให้ตรวจสอบว่า G1 (220VAC→24VDC, 5A ที่ระบุในแผ่น 1) เพียงพอจริงหรือควรอัปเกรด)</li>
+        <li>เฉพาะ BT1 (LT-600Q) ที่ยืนยัน address/ค่าจริงแล้ว — BT2–BT11 ยังอ่านได้ 0 (หรือค่านิ่งไม่สัมพันธ์กับความเป็นจริง) ต้องต่อเซนเซอร์จริงแล้วทดสอบทีละจุดก่อนเปิดแจ้งเตือน (เลข address ที่ตั้งไว้ในระบบแล้วยังไม่ยืนยันกับฮาร์ดแวร์จริง)</li>
+      </ul>
+    </div>
+  </div>
+
+  <div class="titleblock">
+    <div class="tb-title-row">
+      <div class="t1">WATER MONITORING — PLC WIRING DIAGRAM</div>
+      <div class="t2">Wire List Rev.C — 11 จุดวัด</div>
+    </div>
+    <div class="tb-cell"><b>Doc No.</b><span class="val">WM-PLC-001</span></div>
+    <div class="tb-cell"><b>Rev.</b><span class="val">C</span></div>
+    <div class="tb-cell"><b>Scale</b><span class="val">—</span></div>
+    <div class="tb-cell"><b>Sheet</b><span class="val">3 OF 4</span></div>
+    <div class="tb-cell"><b>Date</b><span class="val">2026-09-13</span></div>
+    <div class="tb-cell"><b>Size</b><span class="val">A3</span></div>
+    <div class="tb-cell"><b>Drawn</b><span class="val">—</span></div>
+    <div class="tb-cell"><b>Checked</b><span class="val">— (ตรวจก่อนใช้จริง)</span></div>
+  </div>
+</div>
+
+<!-- ============ SHEET 4 : MODBUS MAPPING TABLE ============ -->
+<div class="sheet">
+  <div class="frame"></div>
+  <div style="position:absolute;left:11mm;top:8mm;right:8mm;bottom:44mm;overflow:hidden;">
+    <h1 class="pagehead">ตาราง Modbus mapping — ทั้ง 11 จุดวัด</h1>
+    <p class="pagesub">unit_id=1 ทุกจุด (LOGO! ตัวเดียว), function code=4 (Read Input Registers) ทุกจุด — ค่าตรงกับที่ตั้งไว้จริงในหน้าจุดวัดของระบบ ณ วันที่ 2026-09-13</p>
+
+    <table class="tterm">
+      <thead><tr><th>Tag</th><th>บ่อ/จุดวัด</th><th>AM2 : Channel</th><th>Modbus address</th><th>สถานะ</th><th>modbus_scale / offset</th></tr></thead>
+      <tbody>
+        <tr><td class="mono">LT-600Q</td><td>บ่อ 600Q (ระดับน้ำ)</td><td class="mono">AM2-1 : I1</td><td class="mono">0</td><td><b>ยืนยันแล้ว</b> (71% จริง)</td><td class="mono">0.1 / 0</td></tr>
+        <tr><td class="mono">LT-1A</td><td>บ่อ 1A (ระดับน้ำ)</td><td class="mono">AM2-1 : I2</td><td class="mono">1</td><td>รอทดสอบ (ตอนนี้อ่านได้ 5%)</td><td class="mono">1 / 0 (ค่าเริ่มต้น)</td></tr>
+        <tr><td class="mono">LT-1B</td><td>บ่อ 1B (ระดับน้ำ)</td><td class="mono">AM2-2 : I3</td><td class="mono">2</td><td>รอทดสอบ (ตอนนี้อ่านได้ 0)</td><td class="mono">1 / 0 (ค่าเริ่มต้น)</td></tr>
+        <tr><td class="mono">LT-2</td><td>บ่อ 2 (ระดับน้ำ)</td><td class="mono">AM2-2 : I4</td><td class="mono">3</td><td>รอทดสอบ (ตอนนี้อ่านได้ 0)</td><td class="mono">1 / 0 (ค่าเริ่มต้น)</td></tr>
+        <tr><td class="mono">LT-3</td><td>บ่อ 3 (ระดับน้ำ)</td><td class="mono">AM2-3 : I5</td><td class="mono">4</td><td>รอทดสอบ (ตอนนี้อ่านได้ 0)</td><td class="mono">1 / 0 (ค่าเริ่มต้น)</td></tr>
+        <tr><td class="mono">LT-4</td><td>บ่อ 4 (ระดับน้ำ)</td><td class="mono">AM2-3 : I6</td><td class="mono">5</td><td>รอทดสอบ (ตอนนี้อ่านได้ 0)</td><td class="mono">1 / 0 (ค่าเริ่มต้น)</td></tr>
+        <tr><td class="mono">LT-5</td><td>บ่อ 5 (ระดับน้ำ)</td><td class="mono">AM2-4 : I7</td><td class="mono">6</td><td>รอทดสอบ (ตอนนี้อ่านได้ 0)</td><td class="mono">1 / 0 (ค่าเริ่มต้น)</td></tr>
+        <tr><td class="mono">TT-05</td><td>บ่อ 5 (อุณหภูมิ)</td><td class="mono">AM2-4 : I8</td><td class="mono">7</td><td>รอทดสอบ (ตอนนี้อ่านได้ 0, ต่ำกว่าพิสัย 15–60)</td><td class="mono">1 / 0 (ค่าเริ่มต้น)</td></tr>
+        <tr><td class="mono">FT-600Q</td><td>บ่อ 600Q (อัตราการไหล)</td><td class="mono">AM2-5 : I9</td><td class="mono">8</td><td>รอทดสอบ (ตอนนี้อ่านได้ 0)</td><td class="mono">1 / 0 (ค่าเริ่มต้น)</td></tr>
+        <tr><td class="mono">PT-AIR</td><td>แรงดันลม</td><td class="mono">AM2-5 : I10</td><td class="mono">9</td><td>รอทดสอบ (ตอนนี้อ่านได้ 0)</td><td class="mono">1 / 0 (ค่าเริ่มต้น)</td></tr>
+        <tr><td class="mono">PT-STM</td><td>แรงดันไอน้ำ</td><td class="mono">AM2-6 : I11</td><td class="mono">10</td><td>รอทดสอบ (ตอนนี้อ่านได้ 0)</td><td class="mono">1 / 0 (ค่าเริ่มต้น)</td></tr>
+      </tbody>
+    </table>
+
+    <div class="note-box" style="margin-top:5mm;">
+      <b>ขั้นตอนสำหรับ BT2–BT11 (ทำทีละตัวเหมือน LT-600Q)</b>
+      <ul>
+        <li>1) ต่อสายตามแผ่นที่ 2 → ตั้งโหมดช่อง AM2 เป็น <b>กระแส (4-20mA)</b> ทุกช่อง (ยืนยันแล้วว่าทุกจุดเป็นสัญญาณกระแส ไม่ใช่แรงดัน) → จ่ายไฟ</li>
+        <li>2) ทดสอบอ่านค่าผ่านปุ่ม "ทดสอบอ่านค่า" ในหน้าจุดวัด เทียบ address ที่ตั้งไว้ล่วงหน้ากับที่ได้จริง</li>
+        <li>3) เปลี่ยนค่าที่วัดจริง (เช่น ระดับน้ำ/อัตราการไหล/อุณหภูมิ/แรงดัน) แล้ว poll ซ้ำ — ค่าต้องขยับตามจริง ไม่ใช่ค่านิ่ง/0 ค้าง จึงจะถือว่ายืนยันจุดนั้นแล้ว</li>
+        <li>4) คำนวณ modbus_scale/offset ตามช่วงค่าจริงของเครื่องมือนั้น (ดูวิธีคำนวณแบบเดียวกับ LT-600Q ใน docs/plc-wiring-logo-am2.md)</li>
+        <li>5) ตั้ง range_min/max และเกณฑ์แจ้งเตือน (ll/hh/ll_critical/hh_critical) ใหม่ให้ตรงหน่วยจริง ก่อนปล่อยให้แจ้งเตือนทำงาน — โดยเฉพาะ TT-05 ที่ range_min=15 ทำให้ค่า 0 ปัจจุบันถูกตีเป็น suspect (quality=0) อยู่แล้ว ไม่ต้องกังวลแจ้งเตือนหลอกจากจุดนี้จนกว่าจะต่อเซนเซอร์จริง</li>
+      </ul>
+    </div>
+  </div>
+
+  <div class="titleblock">
+    <div class="tb-title-row">
+      <div class="t1">WATER MONITORING — PLC WIRING DIAGRAM</div>
+      <div class="t2">Modbus Mapping — 11 จุดวัด</div>
+    </div>
+    <div class="tb-cell"><b>Doc No.</b><span class="val">WM-PLC-001</span></div>
+    <div class="tb-cell"><b>Rev.</b><span class="val">C</span></div>
+    <div class="tb-cell"><b>Scale</b><span class="val">—</span></div>
+    <div class="tb-cell"><b>Sheet</b><span class="val">4 OF 4</span></div>
+    <div class="tb-cell"><b>Date</b><span class="val">2026-09-13</span></div>
+    <div class="tb-cell"><b>Size</b><span class="val">A3</span></div>
+    <div class="tb-cell"><b>Drawn</b><span class="val">—</span></div>
+    <div class="tb-cell"><b>Checked</b><span class="val">— (ตรวจก่อนใช้จริง)</span></div>
+  </div>
+</div>
+
+</body>
+</html>
