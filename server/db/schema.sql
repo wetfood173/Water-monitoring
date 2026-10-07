@@ -68,6 +68,16 @@ CREATE UNIQUE INDEX IF NOT EXISTS plcs_host_port_idx ON plcs (host, port);
 -- ดึงค่าจาก PLC ตัวนี้ทุกกี่วินาที ปรับได้ต่อ PLC จากหน้าเว็บ (ไม่ต้องรีสตาร์ตเซิร์ฟเวอร์)
 ALTER TABLE plcs ADD COLUMN IF NOT EXISTS poll_sec INT NOT NULL DEFAULT 1;
 
+-- ============ บัญชี MongoDB Atlas (เพิ่ม/แก้/ลบได้จากหน้าเว็บ — รองรับหลายคลัสเตอร์/แอคเคาท์พร้อมกัน) ============
+-- uri เก็บ connection string เต็ม (มี credential ฝังอยู่) จึงไม่คืนค่านี้กลับไปที่หน้าเว็บ ส่งแค่ id/name/is_active
+CREATE TABLE IF NOT EXISTS mongo_accounts (
+  id         SERIAL PRIMARY KEY,
+  name       TEXT NOT NULL,
+  uri        TEXT NOT NULL,
+  is_active  BOOLEAN NOT NULL DEFAULT TRUE,
+  sort_order INT
+);
+
 -- ============ จุดวัด ============
 CREATE TABLE IF NOT EXISTS sensors (
   tag          VARCHAR(20) PRIMARY KEY,
@@ -187,7 +197,9 @@ ALTER TABLE sensors ADD COLUMN IF NOT EXISTS modbus_word_swap BOOLEAN NOT NULL D
 -- จุดวัดส่วนใหญ่อ่านผ่าน PLC (modbus) แต่บางจุดรับค่าจากแหล่งอื่นแทน เช่น MongoDB Atlas (real-time change stream)
 -- ตรวจสอบค่าที่ยอมรับได้ในโค้ด (server/routes/sensors.js) ไม่ใช้ CHECK constraint เพื่อให้เพิ่มแหล่งใหม่ได้โดยไม่ต้อง migrate
 ALTER TABLE sensors ADD COLUMN IF NOT EXISTS data_source TEXT NOT NULL DEFAULT 'modbus';
--- ใช้เมื่อ data_source = 'mongodb' — เลือก database/collection ได้จากหน้าเว็บ ต่อคลัสเตอร์เดียวที่ตั้งไว้ใน MONGODB_URI
+-- ใช้เมื่อ data_source = 'mongodb' — เลือกได้ว่าจะอ่านจากบัญชี/คลัสเตอร์ไหน (ตาราง mongo_accounts รองรับหลายบัญชี)
+-- แล้วเลือก database/collection ในคลัสเตอร์นั้นได้จากหน้าเว็บ
+ALTER TABLE sensors ADD COLUMN IF NOT EXISTS mongo_account_id INT REFERENCES mongo_accounts(id);
 ALTER TABLE sensors ADD COLUMN IF NOT EXISTS mongo_db         TEXT;
 ALTER TABLE sensors ADD COLUMN IF NOT EXISTS mongo_collection TEXT;
 -- ดึงค่าล่าสุดจาก collection นี้ทุกกี่วินาที ปรับได้จากหน้าเว็บต่อจุดวัด

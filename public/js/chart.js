@@ -275,7 +275,7 @@ export const POND_COLOR = {
 };
 
 export const SENSOR_COLOR = {
-  "TT-05": "#E08A4F",
+  "TT-TANK5": "#E08A4F",
   "FT-600Q": "#5B9BD5",
   "PT-AIR": "#8FB9DC",
   "PT-STM": "#C9A227",

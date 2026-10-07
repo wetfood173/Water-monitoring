@@ -73,6 +73,8 @@ export const config = {
 
   // จุดวัดบางอันรับค่าจาก MongoDB Atlas แทน PLC — เชื่อมต่อคลัสเตอร์เดียว
   // แต่เลือกได้ว่าจุดวัดแต่ละอันจะอ่านจาก database/collection ไหนจากหน้าเว็บ (ไม่ผูกกับ .env)
+  // เปิด/ปิดการอ่านทั้งระบบทำจากหน้า "จุดวัดและ setpoint" ได้เลย (ค่า mongo.enabled ใน app_settings)
+  // มีผลทันทีไม่ต้องรีสตาร์ตเซิร์ฟเวอร์ — ต่างจาก MODBUS_ENABLED ที่ยังต้องแก้ .env
   mongo: {
     uri: process.env.MONGODB_URI || "",
   },

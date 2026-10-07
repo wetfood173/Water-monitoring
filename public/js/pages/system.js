@@ -3,10 +3,14 @@ import { $, el, clear, fmtDateTime, toast, modal, ROLE_LABEL } from "../util.js"
 
 const ROLES = ["staff", "technician", "engineer", "admin"];
 
+const PAGE_SIZE = 50;
+
 export function systemPage(ctx) {
   const root = el("div");
   let settings = {};
   let status = {};
+  let auditPage = 1;
+  let notifPage = 1;
 
   root.append(
     el("div", { class: "page-head" },
@@ -37,7 +41,7 @@ export function systemPage(ctx) {
 
   const auditCard = el("div", { class: "card" },
     el("h3", {}, el("span", {}, "Audit log"),
-      el("select", { id: "auditFilter", style: "width:200px", onchange: loadAudit },
+      el("select", { id: "auditFilter", style: "width:200px", onchange: () => { auditPage = 1; loadAudit(); } },
         el("option", { value: "" }, "ทุกประเภท"),
         el("option", { value: "auth." }, "การเข้าสู่ระบบ"),
         el("option", { value: "admin." }, "โหมดผู้ดูแลระบบ"),
@@ -178,10 +182,24 @@ export function systemPage(ctx) {
     if (ok) toast("เปลี่ยนรหัส Admin แล้ว");
   }
 
+  /** แถบเปลี่ยนหน้า — ใส่ไว้ท้ายตารางที่แบ่งหน้า ป้องกันหน้าเดียวยาวเกินไปเมื่อข้อมูลเยอะขึ้นตอนใช้งานจริง */
+  function renderPager(box, { page, total, limit, onChange }) {
+    const totalPages = Math.max(1, Math.ceil(total / limit));
+    box.append(
+      el("div", { style: "display:flex;justify-content:space-between;align-items:center;margin-top:10px;font-size:13px;color:var(--mute)" },
+        el("span", {}, `ทั้งหมด ${total.toLocaleString("th-TH")} รายการ · หน้า ${page}/${totalPages}`),
+        el("div", { class: "row", style: "gap:6px" },
+          el("button", { class: "sm", disabled: page <= 1, onclick: () => onChange(page - 1) }, "← ก่อนหน้า"),
+          el("button", { class: "sm", disabled: page >= totalPages, onclick: () => onChange(page + 1) }, "ถัดไป →")))
+    );
+  }
+
   async function loadAudit() {
     const action = $("#auditFilter", root)?.value ?? "";
     try {
-      const { entries } = await api.get(`/api/system/audit?limit=200${action ? `&action=${encodeURIComponent(action)}` : ""}`);
+      const { entries, total } = await api.get(
+        `/api/system/audit?limit=${PAGE_SIZE}&page=${auditPage}${action ? `&action=${encodeURIComponent(action)}` : ""}`
+      );
       const box = clear($("#auditBox", root));
       if (!entries.length) return box.append(el("div", { class: "empty" }, "ยังไม่มีบันทึก"));
       const table = el("table");
@@ -201,6 +219,7 @@ export function systemPage(ctx) {
       }
       table.append(body);
       box.append(table);
+      renderPager(box, { page: auditPage, total, limit: PAGE_SIZE, onChange: (p) => { auditPage = p; loadAudit(); } });
     } catch (err) {
       toast(err.message, "err");
     }
@@ -208,7 +227,7 @@ export function systemPage(ctx) {
 
   async function loadNotifications() {
     try {
-      const { log } = await api.get("/api/system/notifications");
+      const { log, total } = await api.get(`/api/system/notifications?limit=${PAGE_SIZE}&page=${notifPage}`);
       const box = clear($("#notifBox", root));
       if (!log.length) return box.append(el("div", { class: "empty" }, "ยังไม่มีการส่งแจ้งเตือน"));
       const table = el("table");
@@ -216,7 +235,7 @@ export function systemPage(ctx) {
         el("th", {}, "เวลา"), el("th", {}, "แจ้งเตือน"), el("th", {}, "ผู้รับ"),
         el("th", {}, "ชนิด"), el("th", {}, "สถานะ"), el("th", {}, "รายละเอียด"))));
       const body = el("tbody");
-      for (const n of log.slice(0, 100)) {
+      for (const n of log) {
         body.append(el("tr", {},
           el("td", { class: "num" }, fmtDateTime(n.sent_at)),
           el("td", {}, n.tag ? `${n.tag} · ${n.condition}` : `#${n.alarm_id}`),
@@ -227,6 +246,7 @@ export function systemPage(ctx) {
       }
       table.append(body);
       box.append(table);
+      renderPager(box, { page: notifPage, total, limit: PAGE_SIZE, onChange: (p) => { notifPage = p; loadNotifications(); } });
     } catch (err) {
       toast(err.message, "err");
     }

@@ -1,12 +1,13 @@
 import { Router } from "express";
 import { many, one, query } from "../db/index.js";
-import { wrap, badRequest, notFound } from "../lib/http.js";
+import { wrap, badRequest, notFound, conflict } from "../lib/http.js";
 import { requireRole } from "../middleware/auth.js";
 import { audit } from "../lib/audit.js";
 import { invalidateSensors, activeSensors } from "../services/sensorCache.js";
 import { resetDebounce } from "../services/alarmEngine.js";
 import { DATA_TYPES } from "../services/modbusClient.js";
 import { status as modbusStatus, planBlocks, testRead } from "../services/modbusPoller.js";
+import { status as mongoStatus } from "../services/mongoPoller.js";
 import { testMongoRead } from "../services/mongoClient.js";
 import { getSetting } from "../lib/settings.js";
 
@@ -18,25 +19,31 @@ router.get(
   wrap(async (req, res) => {
     const sensors = await many(
       `SELECT s.*, p.name AS pond_name, p.capacity_m3,
-              pl.name AS plc_name, pl.host AS plc_host, pl.port AS plc_port
+              pl.name AS plc_name, pl.host AS plc_host, pl.port AS plc_port,
+              ma.name AS mongo_account_name
          FROM sensors s
          LEFT JOIN ponds p ON p.pond_id = s.pond_id
          LEFT JOIN plcs pl ON pl.id = s.plc_id
+         LEFT JOIN mongo_accounts ma ON ma.id = s.mongo_account_id
         ORDER BY s.sort_order, s.tag`
     );
     const ponds = await many(`SELECT * FROM ponds ORDER BY sort_order`);
     const plcs = await many(`SELECT * FROM plcs ORDER BY sort_order, id`);
+    // uri มี credential ฝังอยู่ จึงไม่ส่งกลับไปที่หน้าเว็บ (ดู server/routes/mongoAccounts.js)
+    const mongoAccounts = await many(`SELECT id, name, is_active, sort_order FROM mongo_accounts ORDER BY sort_order, id`);
     const dashboardCards = await getSetting("dashboard.visible_cards");
     const dashboardHiddenTags = await getSetting("dashboard.hidden_tags");
+    const dashboardLayout = await getSetting("dashboard.layout");
+    const dashboardDiagram = await getSetting("dashboard.diagram");
     // ให้หน้า "ประวัติย้อนหลัง" รู้ว่าข้อมูลดิบเก็บย้อนหลังได้กี่วัน จะได้จำกัดตัวเลือกช่วงวันที่กำหนดเองไม่ให้เกิน
     const retentionRawDays = await getSetting("retention.raw_days");
-    res.json({ sensors, ponds, plcs, dashboardCards, dashboardHiddenTags, retentionRawDays });
+    res.json({ sensors, ponds, plcs, mongoAccounts, dashboardCards, dashboardHiddenTags, dashboardLayout, dashboardDiagram, retentionRawDays });
   })
 );
 
-const NUM_FIELDS = ["ll", "hh", "ll_critical", "hh_critical"];
+const NUM_FIELDS = ["range_min", "range_max", "ll", "hh", "ll_critical", "hh_critical"];
 
-/* แก้ค่า LL/HH — engineer ขึ้นไป (ข้อ 4, 8) */
+/* แก้ค่า LL/HH และพิสัยเครื่องมือวัด — engineer ขึ้นไป (ข้อ 4, 8) */
 router.put(
   "/api/sensors/:tag/setpoints",
   requireRole("engineer"),
@@ -71,6 +78,9 @@ router.put(
     // ตรวจว่าอยู่ในพิสัยก่อน เพื่อให้ข้อความบอกสาเหตุที่ตรงที่สุดเมื่อกรอกค่าเกินพิสัย
     const min = next.range_min == null ? null : Number(next.range_min);
     const max = next.range_max == null ? null : Number(next.range_max);
+    if (min != null && max != null && min >= max) {
+      throw badRequest("พิสัยต่ำสุดต้องน้อยกว่าพิสัยสูงสุด");
+    }
     for (const [field, label] of [["ll", "LL"], ["hh", "HH"], ["ll_critical", "LL วิกฤต"], ["hh_critical", "HH วิกฤต"]]) {
       if (next[field] == null) continue;
       const v = Number(next[field]);
@@ -160,16 +170,27 @@ router.post(
   })
 );
 
+/** สถานะการอ่านจาก MongoDB — เหมือน /api/modbus/status ของฝั่ง PLC */
+router.get(
+  "/api/mongo/status",
+  requireRole("engineer"),
+  wrap(async (req, res) => {
+    res.json({ status: mongoStatus });
+  })
+);
+
 /** ทดสอบอ่านค่าจาก MongoDB database/collection ที่กรอก โดยไม่บันทึกลงฐานข้อมูล */
 router.post(
   "/api/mongo/test-read",
   requireRole("engineer"),
   wrap(async (req, res) => {
+    const accountId = Number(req.body?.account_id);
+    if (!Number.isInteger(accountId)) throw badRequest("ยังไม่ได้เลือกบัญชี MongoDB");
     const db = String(req.body?.db ?? "").trim();
     const collection = String(req.body?.collection ?? "").trim();
     if (!db || !collection) throw badRequest("ต้องระบุทั้ง database และ collection");
     try {
-      const result = await testMongoRead(db, collection);
+      const result = await testMongoRead(accountId, db, collection);
       res.json(result);
     } catch (err) {
       throw badRequest(err.message);
@@ -177,29 +198,269 @@ router.post(
   })
 );
 
-/* แก้ความจุบ่อ — engineer ขึ้นไป (ไม่มีหน้าจอแก้ค่านี้มาก่อน ตั้งได้แค่ตอน seed) */
+/* ================= จัดการบ่อ (เพิ่ม/แก้/ลบ) — engineer ขึ้นไป ================= */
+
+function validatePondPatch(body, { partial }) {
+  const patch = {};
+  if (!partial || "name" in body) {
+    const name = String(body.name ?? "").trim();
+    if (!name) throw badRequest("ต้องระบุชื่อบ่อ");
+    patch.name = name;
+  }
+  if (!partial || "capacity_m3" in body) {
+    const raw = body.capacity_m3;
+    if (raw === null || raw === "" || raw === undefined) {
+      patch.capacity_m3 = null;
+    } else {
+      const n = Number(raw);
+      if (!Number.isFinite(n) || n <= 0) throw badRequest("ความจุต้องเป็นตัวเลขมากกว่า 0");
+      patch.capacity_m3 = n;
+    }
+  }
+  if ("sort_order" in body) patch.sort_order = body.sort_order === null ? null : Number(body.sort_order);
+  if ("is_active" in body) patch.is_active = Boolean(body.is_active);
+  return patch;
+}
+
+router.post(
+  "/api/ponds",
+  requireRole("engineer"),
+  wrap(async (req, res) => {
+    const pond_id = String(req.body?.pond_id ?? "").trim();
+    if (!pond_id || pond_id.length > 8) throw badRequest("รหัสบ่อห้ามว่างและยาวไม่เกิน 8 ตัวอักษร");
+    const existing = await one(`SELECT pond_id FROM ponds WHERE pond_id=$1`, [pond_id]);
+    if (existing) throw conflict(`มีบ่อรหัส ${pond_id} อยู่แล้ว`);
+
+    const patch = validatePondPatch(req.body ?? {}, { partial: false });
+    const created = await one(
+      `INSERT INTO ponds (pond_id, name, capacity_m3, sort_order) VALUES ($1,$2,$3,$4) RETURNING *`,
+      [pond_id, patch.name, patch.capacity_m3, patch.sort_order ?? null]
+    );
+
+    invalidateSensors();
+    await audit(req, { action: "pond.create", target: `pond:${pond_id}`, newValue: created });
+    res.json({ ok: true, pond: created });
+  })
+);
+
 router.put(
-  "/api/ponds/:pond_id/capacity",
+  "/api/ponds/:pond_id",
   requireRole("engineer"),
   wrap(async (req, res) => {
     const pond_id = String(req.params.pond_id);
     const before = await one(`SELECT * FROM ponds WHERE pond_id=$1`, [pond_id]);
     if (!before) throw notFound("ไม่พบบ่อนี้");
 
-    const n = Number(req.body?.capacity_m3);
-    if (!Number.isFinite(n) || n <= 0) throw badRequest("ความจุต้องเป็นตัวเลขมากกว่า 0");
+    const patch = validatePondPatch(req.body ?? {}, { partial: true });
 
-    await query(`UPDATE ponds SET capacity_m3=$1 WHERE pond_id=$2`, [n, pond_id]);
+    let newId = pond_id;
+    if ("pond_id" in (req.body ?? {}) && String(req.body.pond_id).trim() !== pond_id) {
+      newId = String(req.body.pond_id).trim();
+      if (!newId || newId.length > 8) throw badRequest("รหัสบ่อห้ามว่างและยาวไม่เกิน 8 ตัวอักษร");
+      const clash = await one(`SELECT pond_id FROM ponds WHERE pond_id=$1`, [newId]);
+      if (clash) throw conflict(`มีบ่อรหัส ${newId} อยู่แล้ว`);
+      const inUse = await many(`SELECT tag FROM sensors WHERE pond_id=$1`, [pond_id]);
+      if (inUse.length) {
+        throw conflict(`เปลี่ยนรหัสบ่อไม่ได้ — มีจุดวัดผูกอยู่ ${inUse.length} จุด (${inUse.map((s) => s.tag).join(", ")}) ย้ายออกก่อน`);
+      }
+    }
+
+    if (!Object.keys(patch).length && newId === pond_id) throw badRequest("ไม่มีข้อมูลที่จะแก้ไข");
+
+    if (newId !== pond_id) await query(`UPDATE ponds SET pond_id=$2 WHERE pond_id=$1`, [pond_id, newId]);
+    if (Object.keys(patch).length) {
+      const cols = Object.keys(patch);
+      const sets = cols.map((c, i) => `${c} = $${i + 2}`).join(", ");
+      await query(`UPDATE ponds SET ${sets} WHERE pond_id = $1`, [newId, ...cols.map((c) => patch[c])]);
+    }
+
     invalidateSensors();
     await audit(req, {
-      action: "pond.capacity.change",
+      action: "pond.update",
       target: `pond:${pond_id}`,
-      oldValue: before.capacity_m3,
-      newValue: n,
+      oldValue: { pond_id, ...Object.fromEntries(Object.keys(patch).map((c) => [c, before[c]])) },
+      newValue: { pond_id: newId, ...patch },
     });
 
-    const after = await one(`SELECT * FROM ponds WHERE pond_id=$1`, [pond_id]);
+    const after = await one(`SELECT * FROM ponds WHERE pond_id=$1`, [newId]);
     res.json({ ok: true, pond: after });
+  })
+);
+
+router.delete(
+  "/api/ponds/:pond_id",
+  requireRole("engineer"),
+  wrap(async (req, res) => {
+    const pond_id = String(req.params.pond_id);
+    const before = await one(`SELECT * FROM ponds WHERE pond_id=$1`, [pond_id]);
+    if (!before) throw notFound("ไม่พบบ่อนี้");
+
+    const inUse = await many(`SELECT tag FROM sensors WHERE pond_id=$1`, [pond_id]);
+    if (inUse.length) {
+      throw conflict(`ลบไม่ได้ — มีจุดวัดผูกอยู่ ${inUse.length} จุด (${inUse.map((s) => s.tag).join(", ")})`);
+    }
+
+    await query(`DELETE FROM ponds WHERE pond_id=$1`, [pond_id]);
+    invalidateSensors();
+    await audit(req, { action: "pond.delete", target: `pond:${pond_id}`, oldValue: before });
+    res.json({ ok: true });
+  })
+);
+
+/* ================= จัดการจุดวัด (เพิ่ม/แก้ข้อมูลทั่วไป/ลบ) — engineer ขึ้นไป =================
+ * รหัสย่อ (tag) เปลี่ยนได้เฉพาะตอนที่ยังไม่มีข้อมูลย้อนหลัง (ค่าที่อ่านได้/แจ้งเตือน) ผูกอยู่
+ * เพื่อกันไม่ให้ประวัติเก่าอ้างอิงรหัสที่ไม่มีอยู่จริง — ถ้ามีข้อมูลแล้วต้องลบจุดวัดนี้แล้วเพิ่มใหม่แทน
+ */
+
+const TAG_RE = /^[A-Za-z0-9_-]{1,20}$/;
+
+/** มีค่าที่อ่านได้จริงบันทึกไว้หรือไม่ (ไม่นับแจ้งเตือน "ขาดสัญญาณ" ที่ alarm engine สร้างเองอัตโนมัติ
+    ให้ทุกจุดวัดที่ยังไม่ได้ตั้งแหล่งข้อมูล — นับแบบนั้นจะทำให้จุดวัดที่เพิ่งสร้างแล้วยังไม่ทันตั้งค่า ลบ/เปลี่ยนรหัสไม่ได้ทันที) */
+async function tagHasReadings(tag) {
+  const row = await one(
+    `SELECT 1 AS x FROM readings WHERE tag=$1
+     UNION ALL SELECT 1 FROM readings_hourly WHERE tag=$1
+     LIMIT 1`,
+    [tag]
+  );
+  return Boolean(row);
+}
+
+/** ลบแจ้งเตือน (และ log การแจ้งเตือนที่อ้างถึง) ของจุดวัดนี้ทิ้ง — ใช้ก่อนลบ/เปลี่ยนรหัสย่อ
+    เมื่อไม่มีค่าที่อ่านได้จริงแล้ว (เหลือแค่แจ้งเตือน "ขาดสัญญาณ" อัตโนมัติซึ่งไม่มีความหมายอีกต่อไป) */
+async function clearSensorAlarms(tag) {
+  await query(`DELETE FROM notification_log WHERE alarm_id IN (SELECT id FROM alarms WHERE tag=$1)`, [tag]);
+  await query(`DELETE FROM alarms WHERE tag=$1`, [tag]);
+}
+
+router.post(
+  "/api/sensors",
+  requireRole("engineer"),
+  wrap(async (req, res) => {
+    const tag = String(req.body?.tag ?? "").trim().toUpperCase();
+    if (!TAG_RE.test(tag)) throw badRequest("รหัสย่อต้องเป็นตัวอักษร/ตัวเลข/-/_ ยาวไม่เกิน 20 ตัว");
+    const existing = await one(`SELECT tag FROM sensors WHERE tag=$1`, [tag]);
+    if (existing) throw conflict(`มีจุดวัดรหัส ${tag} อยู่แล้ว`);
+
+    const name = String(req.body?.name ?? "").trim();
+    if (!name) throw badRequest("ต้องระบุชื่อจุดวัด");
+    const metric = String(req.body?.metric ?? "").trim();
+    if (!metric) throw badRequest("ต้องระบุประเภทค่าที่วัด");
+    const unit = String(req.body?.unit ?? "").trim();
+    if (!unit) throw badRequest("ต้องระบุหน่วย");
+
+    let pond_id = req.body?.pond_id ? String(req.body.pond_id).trim() : null;
+    if (pond_id) {
+      const pond = await one(`SELECT pond_id FROM ponds WHERE pond_id=$1`, [pond_id]);
+      if (!pond) throw badRequest("ไม่พบบ่อที่เลือก");
+    }
+
+    const decimals = Number(req.body?.decimals ?? 1);
+    if (!Number.isInteger(decimals) || decimals < 0 || decimals > 6) throw badRequest("ทศนิยมต้องเป็นจำนวนเต็ม 0–6");
+
+    const created = await one(
+      `INSERT INTO sensors (tag, pond_id, name, metric, unit, decimals, sort_order)
+       VALUES ($1,$2,$3,$4,$5,$6,$7) RETURNING *`,
+      [tag, pond_id, name, metric, unit, decimals, req.body?.sort_order ?? null]
+    );
+
+    invalidateSensors();
+    await audit(req, { action: "sensor.create", target: `sensor:${tag}`, newValue: { tag, name, metric, unit, pond_id } });
+    res.json({ ok: true, sensor: created });
+  })
+);
+
+/** แก้ข้อมูลทั่วไป (ชื่อ, บ่อ, ประเภทค่า, หน่วย, ทศนิยม, ลำดับ) และเปลี่ยนรหัสย่อ (tag) ได้ถ้ายังไม่มีข้อมูลย้อนหลัง */
+router.put(
+  "/api/sensors/:tag/info",
+  requireRole("engineer"),
+  wrap(async (req, res) => {
+    const tag = String(req.params.tag);
+    const before = await one(`SELECT * FROM sensors WHERE tag=$1`, [tag]);
+    if (!before) throw notFound("ไม่พบจุดวัดนี้");
+
+    const patch = {};
+    if ("name" in req.body) {
+      const v = String(req.body.name ?? "").trim();
+      if (!v) throw badRequest("ต้องระบุชื่อจุดวัด");
+      patch.name = v;
+    }
+    if ("metric" in req.body) {
+      const v = String(req.body.metric ?? "").trim();
+      if (!v) throw badRequest("ต้องระบุประเภทค่าที่วัด");
+      patch.metric = v;
+    }
+    if ("unit" in req.body) {
+      const v = String(req.body.unit ?? "").trim();
+      if (!v) throw badRequest("ต้องระบุหน่วย");
+      patch.unit = v;
+    }
+    if ("decimals" in req.body) {
+      const n = Number(req.body.decimals);
+      if (!Number.isInteger(n) || n < 0 || n > 6) throw badRequest("ทศนิยมต้องเป็นจำนวนเต็ม 0–6");
+      patch.decimals = n;
+    }
+    if ("sort_order" in req.body) patch.sort_order = req.body.sort_order === null ? null : Number(req.body.sort_order);
+    if ("pond_id" in req.body) {
+      const v = req.body.pond_id ? String(req.body.pond_id).trim() : null;
+      if (v) {
+        const pond = await one(`SELECT pond_id FROM ponds WHERE pond_id=$1`, [v]);
+        if (!pond) throw badRequest("ไม่พบบ่อที่เลือก");
+      }
+      patch.pond_id = v;
+    }
+
+    let newTag = tag;
+    if ("tag" in req.body && String(req.body.tag).trim().toUpperCase() !== tag) {
+      newTag = String(req.body.tag).trim().toUpperCase();
+      if (!TAG_RE.test(newTag)) throw badRequest("รหัสย่อต้องเป็นตัวอักษร/ตัวเลข/-/_ ยาวไม่เกิน 20 ตัว");
+      const clash = await one(`SELECT tag FROM sensors WHERE tag=$1`, [newTag]);
+      if (clash) throw conflict(`มีจุดวัดรหัส ${newTag} อยู่แล้ว`);
+      if (await tagHasReadings(tag)) {
+        throw conflict("เปลี่ยนรหัสย่อไม่ได้ — มีค่าที่อ่านได้ย้อนหลังผูกกับจุดวัดนี้อยู่แล้ว");
+      }
+      await clearSensorAlarms(tag); // เหลือแค่แจ้งเตือน "ขาดสัญญาณ" อัตโนมัติ ไม่มีความหมายต่อหลังเปลี่ยนรหัส
+    }
+
+    if (!Object.keys(patch).length && newTag === tag) throw badRequest("ไม่มีข้อมูลที่จะแก้ไข");
+
+    if (newTag !== tag) await query(`UPDATE sensors SET tag=$2 WHERE tag=$1`, [tag, newTag]);
+    if (Object.keys(patch).length) {
+      const cols = Object.keys(patch);
+      const sets = cols.map((c, i) => `${c} = $${i + 2}`).join(", ");
+      await query(`UPDATE sensors SET ${sets} WHERE tag = $1`, [newTag, ...cols.map((c) => patch[c])]);
+    }
+
+    invalidateSensors();
+    await audit(req, {
+      action: "sensor.info.change",
+      target: `sensor:${tag}`,
+      oldValue: { tag, ...Object.fromEntries(Object.keys(patch).map((c) => [c, before[c]])) },
+      newValue: { tag: newTag, ...patch },
+    });
+
+    const after = await one(`SELECT * FROM sensors WHERE tag=$1`, [newTag]);
+    res.json({ ok: true, sensor: after });
+  })
+);
+
+router.delete(
+  "/api/sensors/:tag",
+  requireRole("engineer"),
+  wrap(async (req, res) => {
+    const tag = String(req.params.tag);
+    const before = await one(`SELECT * FROM sensors WHERE tag=$1`, [tag]);
+    if (!before) throw notFound("ไม่พบจุดวัดนี้");
+
+    if (await tagHasReadings(tag)) {
+      throw conflict("ลบไม่ได้ — มีค่าที่อ่านได้ย้อนหลังผูกกับจุดวัดนี้อยู่แล้ว");
+    }
+    await clearSensorAlarms(tag); // เหลือแค่แจ้งเตือน "ขาดสัญญาณ" อัตโนมัติ ไม่มีความหมายต่อหลังลบจุดวัด
+
+    await query(`DELETE FROM sensors WHERE tag=$1`, [tag]);
+    invalidateSensors();
+    await audit(req, { action: "sensor.delete", target: `sensor:${tag}`, oldValue: before });
+    res.json({ ok: true });
   })
 );
 
@@ -271,6 +532,18 @@ router.put(
       patch[field] = n;
     }
     if ("modbus_word_swap" in req.body) patch.modbus_word_swap = Boolean(req.body.modbus_word_swap);
+    if ("mongo_account_id" in req.body) {
+      const raw = req.body.mongo_account_id;
+      if (raw === null || raw === "") {
+        patch.mongo_account_id = null;
+      } else {
+        const n = Number(raw);
+        if (!Number.isInteger(n)) throw badRequest("บัญชี MongoDB ไม่ถูกต้อง");
+        const account = await one(`SELECT id FROM mongo_accounts WHERE id=$1`, [n]);
+        if (!account) throw badRequest("ไม่พบบัญชี MongoDB ที่เลือก");
+        patch.mongo_account_id = n;
+      }
+    }
     if ("mongo_db" in req.body) {
       const v = String(req.body.mongo_db ?? "").trim();
       patch.mongo_db = v || null;

@@ -14,6 +14,7 @@ import { router as readingRoutes } from "./routes/readings.js";
 import { router as alarmRoutes } from "./routes/alarms.js";
 import { router as sensorRoutes } from "./routes/sensors.js";
 import { router as plcRoutes } from "./routes/plcs.js";
+import { router as mongoAccountRoutes } from "./routes/mongoAccounts.js";
 import { router as employeeRoutes } from "./routes/employees.js";
 import { router as exportRoutes } from "./routes/export.js";
 import { router as systemRoutes } from "./routes/system.js";
@@ -24,7 +25,7 @@ import { rollupHourly } from "./services/rollup.js";
 import { runBackup } from "./services/backup.js";
 import { startSimulator, backfill } from "./services/simulator.js";
 import { startModbusPoller, stopModbusPoller, status as modbusStatus } from "./services/modbusPoller.js";
-import { startMongoPoller, stopMongoPoller } from "./services/mongoPoller.js";
+import { startMongoPoller, stopMongoPoller, status as mongoStatus } from "./services/mongoPoller.js";
 import { closeMongo } from "./services/mongoClient.js";
 
 const app = express();
@@ -43,6 +44,7 @@ app.use(readingRoutes);
 app.use(alarmRoutes);
 app.use(sensorRoutes);
 app.use(plcRoutes);
+app.use(mongoAccountRoutes);
 app.use(employeeRoutes);
 app.use(exportRoutes);
 app.use(systemRoutes);
@@ -134,6 +136,11 @@ async function main() {
     config.modbus.enabled
       ? `${modbusStatus.plcs.length} PLC ทุก ${config.modbus.pollMs} มิลลิวินาที (ตั้งค่า PLC ได้จากหน้าจุดวัด)`
       : "ปิด"
+  }
+  MongoDB Atlas  ${
+    mongoStatus.accounts.length
+      ? `${mongoStatus.accounts.filter((a) => a.isActive).length}/${mongoStatus.accounts.length} บัญชีเปิดใช้งาน · ${mongoStatus.watchers.length} จุดวัด (จัดการได้จากหน้าจุดวัด)`
+      : "ยังไม่มีบัญชี (เพิ่มได้จากหน้าจุดวัด)"
   }
   ข้อมูลจำลอง     ${config.simulate ? "เปิด" : "ปิด (รอค่าจาก Modbus หรือ /api/ingest)"}
   เข้าระบบพัฒนา   ${config.devLogin ? "เปิด" : "ปิด"}

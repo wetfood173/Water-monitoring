@@ -47,12 +47,12 @@ function channel(prefix, defaults) {
 
 export const config = {
   plc: {
-    host: process.env.PLC_HOST || "192.168.0.5",
+    host: process.env.PLC_HOST || "192.168.0.3",
     port: int(process.env.PLC_PORT, 502),
     unitId: int(process.env.MODBUS_UNIT_ID, 1),
-    pollMs: int(process.env.MODBUS_POLL_MS, 1000),
-    timeoutMs: int(process.env.MODBUS_TIMEOUT_MS, 3000),
-    reconnectMs: int(process.env.MODBUS_RECONNECT_MS, 5000),
+    pollMs: int(process.env.MODBUS_POLL_MS, 5000),
+    timeoutMs: int(process.env.MODBUS_TIMEOUT_MS, 8000),
+    reconnectMs: int(process.env.MODBUS_RECONNECT_MS, 10000),
   },
 
   mongo: {

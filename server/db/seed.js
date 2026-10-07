@@ -1,5 +1,6 @@
 import { query } from "./index.js";
 import { hashSecret } from "../lib/hash.js";
+import { config } from "../config.js";
 
 /* ค่า LL/HH และความจุทั้งหมดยังเป็นค่าสมมติจาก prototype
    ต้องแทนด้วยค่าจริงจากหน้างานก่อนใช้งานจริง (Product.md ข้อ 11.4, 11.5) */
@@ -16,7 +17,7 @@ const LEVEL_SCALE = 0.1;
 
 export const PONDS = [
   { pond_id: "1A",   name: "บ่อ 1A",   capacity_m3: 1200, sort_order: 1, role_note: "จ่ายเข้าสายผลิต",        src_note: "Softener",                     dst_note: "สายการผลิต" },
-  { pond_id: "1B",   name: "บ่อ 1B",   capacity_m3: 1200, sort_order: 2, role_note: "รับน้ำอ่อน + น้ำกลับ",   src_note: "Softener · Cooling Tower",     dst_note: "บ่อ 2" },
+  { pond_id: "1B",   name: "บ่อ 1B",   capacity_m3: 1200, sort_order: 2, role_note: "รับน้ำจาก Softener + น้ำกลับ",   src_note: "Softener · Cooling Tower",     dst_note: "บ่อ 2" },
   { pond_id: "2",    name: "บ่อ 2",    capacity_m3: 1800, sort_order: 3, role_note: "บ่อกระจายน้ำ",           src_note: "บ่อ 1B · Retort A–E",          dst_note: "บ่อ 3 · บ่อ 4 · Cooling Tower" },
   { pond_id: "3",    name: "บ่อ 3",    capacity_m3: 1800, sort_order: 4, role_note: "รับน้ำจาก Cooling Tower", src_note: "บ่อ 2 · Cooling Tower",        dst_note: "—" },
   { pond_id: "4",    name: "บ่อ 4",    capacity_m3: 2400, sort_order: 5, role_note: "รับน้ำกลับ Retort F–N",  src_note: "บ่อ 2 · Retort F–N",           dst_note: "บ่อ 5" },
@@ -39,7 +40,6 @@ export const SENSORS = [
   { tag: "LT-4",    pond_id: "4",    name: "ระดับน้ำ บ่อ 4",           metric: "level",       unit: "%",    range_min: 0,  range_max: 100, ll: 30, hh: 90, ll_critical: 15, hh_critical: 96, decimals: 1, sort_order: 5,  modbus_address: AI_BASE + 4,  modbus_scale: LEVEL_SCALE },
   { tag: "LT-5",    pond_id: "5",    name: "ระดับน้ำ บ่อ 5",           metric: "level",       unit: "%",    range_min: 0,  range_max: 100, ll: 35, hh: 92, ll_critical: 18, hh_critical: 97, decimals: 1, sort_order: 6,  modbus_address: AI_BASE + 5,  modbus_scale: LEVEL_SCALE },
   { tag: "LT-600Q", pond_id: "600Q", name: "ระดับน้ำ บ่อ 600Q",        metric: "level",       unit: "%",    range_min: 0,  range_max: 100, ll: 20, hh: 85, ll_critical: 8,  hh_critical: 94, decimals: 1, sort_order: 7,  modbus_address: AI_BASE + 6,  modbus_scale: LEVEL_SCALE },
-  { tag: "TT-05",   pond_id: "5",    name: "อุณหภูมิน้ำ บ่อ 5",        metric: "temperature", unit: "°C",   range_min: 15, range_max: 60,  ll: 20, hh: 45, ll_critical: null, hh_critical: 52, decimals: 1, sort_order: 8,  modbus_address: AI_BASE + 7,  modbus_scale: 1 },
   { tag: "FT-600Q", pond_id: "600Q", name: "อัตราการไหลขาเข้า บ่อ 600Q", metric: "flow",      unit: "m³/h", range_min: 0,  range_max: 200, ll: 40, hh: 180, ll_critical: 15, hh_critical: 195, decimals: 0, sort_order: 9,  modbus_address: AI_BASE + 8,  modbus_scale: 1 },
   { tag: "PT-AIR",  pond_id: null,   name: "แรงดันลม",                 metric: "pressure",    unit: "bar",  range_min: 0,  range_max: 10,  ll: 4.5, hh: 8.5, ll_critical: 3.0, hh_critical: 9.4, decimals: 2, sort_order: 10, modbus_address: AI_BASE + 9,  modbus_scale: 1 },
   { tag: "PT-STM",  pond_id: null,   name: "แรงดันไอน้ำ",              metric: "pressure",    unit: "bar",  range_min: 0,  range_max: 12,  ll: 5.0, hh: 9.5, ll_critical: 3.5, hh_critical: 11.0, decimals: 2, sort_order: 11, modbus_address: AI_BASE + 10, modbus_scale: 1 },
@@ -84,6 +84,10 @@ export const DEFAULT_SETTINGS = {
   "dashboard.visible_cards": { diagram: true, instruments: true, chart: true, alarms: true },
   // ซ่อนเครื่องมือวัดรายจุด (เช่น แรงดันลม/ไอน้ำ) โดยไม่ต้องปิดทั้งการ์ด — เก็บเป็นรายการ tag ที่ซ่อน
   "dashboard.hidden_tags": [],
+  // layout ตารางของหน้า Dashboard ที่แอดมินจัดเอง — null = ใช้ layout เริ่มต้นที่หน้าเว็บสร้างจาก visible_cards
+  "dashboard.layout": null,
+  // ผังบ่อ (ถัง อุปกรณ์ เกจ เส้นท่อ) ที่แอดมินจัดเอง — null = ใช้ผังเริ่มต้นใน public/js/diagram.js
+  "dashboard.diagram": null,
 };
 
 async function upsertPonds() {
@@ -126,6 +130,28 @@ async function backfillMongoDefaults() {
   await query(
     `UPDATE sensors SET mongo_db = 'Tank600Q', mongo_collection = 'Level Water'
       WHERE tag IN ('LT-600Q','FT-600Q') AND mongo_db IS NULL AND mongo_collection IS NULL`
+  );
+}
+
+/** ระบบเดิมรองรับ MongoDB Atlas คลัสเตอร์เดียวจาก MONGODB_URI ใน .env — ย้ายมาเป็นบัญชีแรกใน
+    mongo_accounts ให้อัตโนมัติครั้งเดียวตอนอัปเกรด (ตาราง mongo_accounts ยังว่างอยู่) จากนั้นเพิ่ม/แก้/ลบ
+    บัญชีอื่นได้จากหน้าเว็บโดยตรง ไม่ต้องแก้ .env อีก */
+async function backfillMongoAccountFromEnv() {
+  if (config.mongo.uri) {
+    const { rows: existing } = await query(`SELECT count(*)::int AS n FROM mongo_accounts`);
+    if (existing[0].n === 0) {
+      await query(
+        `INSERT INTO mongo_accounts (name, uri, is_active, sort_order) VALUES ($1,$2,TRUE,1)`,
+        ["MongoDB Atlas", config.mongo.uri]
+      );
+    }
+  }
+  // จุดวัดเก่าที่ยังไม่เคยเลือกบัญชี (มาจากตอนระบบรองรับ MongoDB คลัสเตอร์เดียว) ให้ผูกกับบัญชีแรกเป็นค่าเริ่มต้น
+  // เพื่อไม่ให้หยุดอ่านค่าไปเฉย ๆ หลังอัปเกรด — แก้เป็นบัญชีอื่นได้จากหน้าจอ (รันซ้ำได้ทุกครั้งที่ seed เหมือน backfillSensorPlc ด้านบน)
+  await query(
+    `UPDATE sensors SET mongo_account_id = (SELECT id FROM mongo_accounts ORDER BY sort_order, id LIMIT 1)
+      WHERE data_source='mongodb' AND mongo_account_id IS NULL
+        AND EXISTS (SELECT 1 FROM mongo_accounts)`
   );
 }
 
@@ -191,6 +217,7 @@ export async function seed() {
   await upsertSensors();
   await backfillSensorPlc();
   await backfillMongoDefaults();
+  await backfillMongoAccountFromEnv();
   await upsertEmployees();
   await seedSettings();
 }

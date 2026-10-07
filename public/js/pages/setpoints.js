@@ -14,6 +14,7 @@ export function setpointsPage(ctx) {
   let sensors = [];
   let ponds = [];
   let plcs = [];
+  let mongoAccounts = [];
 
   root.append(
     el("div", { class: "page-head" },
@@ -39,40 +40,164 @@ export function setpointsPage(ctx) {
     el("div", { class: "tablewrap", id: "plcTable" }));
   root.append(plcCard);
 
+  const mongoManageCard = el("div", { class: "card" },
+    el("h3", {},
+      el("span", {}, "MongoDB Atlas"),
+      el("button", { class: "sm", style: "float:right", onclick: () => editMongoAccount(null) }, "+ เพิ่ม MongoDB")),
+    el("p", { style: "font-size:12.5px;color:var(--mute);margin:-6px 0 10px" },
+      "จุดวัดแต่ละอันเลือกได้ว่าจะอ่านผ่าน MongoDB บัญชีไหนแทน PLC — เพิ่มได้เรื่อย ๆ ถ้ามีคลัสเตอร์/แอคเคาท์อื่นในอนาคต " +
+      "ตั้ง database/collection ต่อจุดวัดได้จากตารางจุดวัดด้านล่าง"),
+    el("div", { class: "tablewrap", id: "mongoTable" }));
+  root.append(mongoManageCard);
+
   const modbusCard = el("div", { class: "card" }, el("h3", {}, "การเชื่อมต่อ PLC (Modbus TCP)"), el("div", { id: "mbStatus" }));
   root.append(modbusCard);
 
+  const mongoCard = el("div", { class: "card" }, el("h3", {}, "การเชื่อมต่อ MongoDB Atlas"), el("div", { id: "mgStatus" }));
+  root.append(mongoCard);
+
   root.append(
     el("div", { class: "card" },
-      el("h3", {}, "ความจุบ่อ (ปริมาตรน้ำเต็มถัง)"),
+      el("h3", {},
+        el("span", {}, "โซน"),
+        el("button", { class: "sm", style: "float:right", onclick: () => editPond(null) }, "+ เพิ่มโซน")),
       el("p", { style: "font-size:12.5px;color:var(--mute);margin:-6px 0 10px" },
-        "ใช้คำนวณปริมาตรน้ำจริง = ความจุ × ระดับน้ำ (%) — แก้ให้ตรงกับขนาดถัง/บ่อจริงแต่ละใบก่อนดูค่าปริมาตรบนแดชบอร์ด"),
+        "ความจุใช้คำนวณปริมาตรน้ำจริง = ความจุ × ระดับน้ำ (%) — แก้ให้ตรงกับขนาดถัง/โซนจริงแต่ละจุดก่อนดูค่าปริมาตรบนแดชบอร์ด"),
       el("div", { class: "tablewrap", id: "pondTable" }))
   );
 
-  root.append(el("div", { class: "card" }, el("h3", {}, "จุดวัดทั้งหมด"), el("div", { class: "tablewrap", id: "spTable" })));
+  root.append(
+    el("div", { class: "card" },
+      el("h3", {},
+        el("span", {}, "จุดวัดทั้งหมด"),
+        el("button", { class: "sm", style: "float:right", onclick: () => editSensorInfo(null) }, "+ เพิ่มจุดวัด")),
+      el("div", { class: "tablewrap", id: "spTable" })));
 
-  /* ---------- แก้ความจุบ่อ ---------- */
+  /* ---------- เพิ่ม/แก้โซน ---------- */
 
-  async function editCapacity(p) {
-    const capacity = el("input", { type: "number", step: "any", min: "0.01", value: p.capacity_m3 ?? "" });
+  async function editPond(p) {
+    const isNew = !p;
+    const pondId = el("input", { type: "text", maxlength: "8", value: p?.pond_id ?? "", placeholder: "เช่น 6, 600R" });
+    const name = el("input", { type: "text", value: p?.name ?? "", placeholder: "เช่น โซน 6" });
+    const capacity = el("input", { type: "number", step: "any", min: "0.01", value: p?.capacity_m3 ?? "" });
+    const active = el("input", { type: "checkbox" });
+    active.checked = p ? Boolean(p.is_active) : true;
 
     const ok = await modal({
-      title: `ความจุบ่อ · ${p.name}`,
+      title: isNew ? "เพิ่มโซน" : `แก้ไขโซน · ${p.name}`,
       confirmLabel: "บันทึก",
       body: el("div", {},
-        el("p", { style: "font-size:13px;color:var(--mute);margin-bottom:14px" },
-          `รหัสบ่อ ${p.pond_id} — ค่านี้คูณกับ % ระดับน้ำเพื่อแสดงปริมาตรจริง`),
-        el("div", { class: "field" }, el("label", {}, "ความจุเต็มถัง"), capacity)),
+        el("div", { class: "field" }, el("label", {}, "รหัสโซน (ย่อ ไม่เกิน 8 ตัวอักษร)"), pondId),
+        el("div", { class: "field", style: "margin-top:12px" }, el("label", {}, "ชื่อโซน"), name),
+        el("div", { class: "field", style: "margin-top:12px" }, el("label", {}, "ความจุเต็มถัง (m³) — เว้นว่างได้"), capacity),
+        !isNew
+          ? el("p", { style: "font-size:12px;color:var(--mute);margin-top:10px" },
+              "เปลี่ยนรหัสโซนได้เฉพาะตอนยังไม่มีจุดวัดผูกอยู่ — ย้ายจุดวัดออกก่อนถ้าต้องการเปลี่ยน")
+          : null,
+        !isNew
+          ? el("label", { style: "display:flex;gap:8px;align-items:center;margin-top:12px;color:var(--bone);font-size:13px" },
+              active, "เปิดใช้งาน")
+          : null),
       onConfirm: async () => {
-        const n = Number(capacity.value);
-        if (!Number.isFinite(n) || n <= 0) throw new Error("ความจุต้องเป็นตัวเลขมากกว่า 0");
-        return api.put(`/api/ponds/${encodeURIComponent(p.pond_id)}/capacity`, { capacity_m3: n });
+        const body = {
+          name: name.value.trim(),
+          capacity_m3: capacity.value === "" ? null : Number(capacity.value),
+        };
+        if (isNew) {
+          body.pond_id = pondId.value.trim();
+          return api.post("/api/ponds", body);
+        }
+        if (pondId.value.trim() !== p.pond_id) body.pond_id = pondId.value.trim();
+        body.is_active = active.checked;
+        return api.put(`/api/ponds/${encodeURIComponent(p.pond_id)}`, body);
       },
     });
     if (ok) {
-      toast(`บันทึกความจุของ ${p.name} แล้ว`);
+      toast(isNew ? `เพิ่มโซน "${ok.pond.name}" แล้ว` : `บันทึกโซน "${ok.pond.name}" แล้ว`);
       load();
+    }
+  }
+
+  async function deletePond(p) {
+    const ok = await confirmDialog(
+      "ลบโซน",
+      `ลบ "${p.name}" (${p.pond_id}) ออกจากระบบ — ลบได้เฉพาะตอนไม่มีจุดวัดผูกอยู่เท่านั้น`,
+      "ลบ"
+    );
+    if (!ok) return;
+    try {
+      await api.del(`/api/ponds/${encodeURIComponent(p.pond_id)}`);
+      toast(`ลบโซน "${p.name}" แล้ว`);
+      load();
+    } catch (err) {
+      toast(err.message, "err");
+    }
+  }
+
+  /* ---------- เพิ่ม/แก้ข้อมูลทั่วไปของจุดวัด ---------- */
+
+  async function editSensorInfo(s) {
+    const isNew = !s;
+    const tag = el("input", { type: "text", maxlength: "20", value: s?.tag ?? "", placeholder: "เช่น PT-06" });
+    const name = el("input", { type: "text", value: s?.name ?? "", placeholder: "เช่น แรงดันลม โซน 6" });
+    const pondSelect = el("select", {},
+      el("option", { value: "", selected: s?.pond_id == null }, "— ไม่ผูกกับโซน —"),
+      ...ponds.map((p) => el("option", { value: p.pond_id, selected: s?.pond_id === p.pond_id }, `${p.name} (${p.pond_id})`)));
+    const metric = el("input", { type: "text", value: s?.metric ?? "", placeholder: "เช่น level, pressure, flow, temperature" });
+    const unit = el("input", { type: "text", value: s?.unit ?? "", placeholder: "เช่น %, bar, m³/h, °C" });
+    const decimals = el("input", { type: "number", step: "1", min: "0", max: "6", value: s?.decimals ?? 1 });
+
+    const ok = await modal({
+      title: isNew ? "เพิ่มจุดวัด" : `แก้ไขข้อมูล · ${s.name}`,
+      confirmLabel: "บันทึก",
+      body: el("div", {},
+        el("div", { class: "field" }, el("label", {}, "รหัสย่อ (tag)"), tag),
+        el("div", { class: "field", style: "margin-top:12px" }, el("label", {}, "ชื่อจุดวัด"), name),
+        el("div", { class: "field", style: "margin-top:12px" }, el("label", {}, "โซนที่ผูกอยู่"), pondSelect),
+        el("div", { class: "row", style: "margin-top:12px" },
+          el("div", { class: "field" }, el("label", {}, "ประเภทค่า (metric)"), metric),
+          el("div", { class: "field" }, el("label", {}, "หน่วย"), unit)),
+        el("div", { class: "field", style: "margin-top:12px;max-width:120px" }, el("label", {}, "ทศนิยม"), decimals),
+        !isNew
+          ? el("p", { style: "font-size:12px;color:var(--mute);margin-top:10px" },
+              "เปลี่ยนรหัสย่อได้เฉพาะตอนยังไม่มีข้อมูลย้อนหลัง (ค่าที่อ่านได้/แจ้งเตือน) ผูกอยู่")
+          : el("p", { style: "font-size:12px;color:var(--mute);margin-top:10px" },
+              "เพิ่มแล้วตั้ง LL/HH และแหล่งข้อมูล (PLC/MongoDB) ต่อได้จากตารางด้านล่าง")),
+      onConfirm: async () => {
+        const body = {
+          name: name.value.trim(),
+          pond_id: pondSelect.value || null,
+          metric: metric.value.trim(),
+          unit: unit.value.trim(),
+          decimals: Number(decimals.value),
+        };
+        if (isNew) {
+          body.tag = tag.value.trim();
+          return api.post("/api/sensors", body);
+        }
+        if (tag.value.trim().toUpperCase() !== s.tag) body.tag = tag.value.trim();
+        return api.put(`/api/sensors/${encodeURIComponent(s.tag)}/info`, body);
+      },
+    });
+    if (ok) {
+      toast(isNew ? `เพิ่มจุดวัด "${ok.sensor.name}" แล้ว` : `บันทึกข้อมูล "${ok.sensor.name}" แล้ว`);
+      load();
+    }
+  }
+
+  async function deleteSensor(s) {
+    const ok = await confirmDialog(
+      "ลบจุดวัด",
+      `ลบ "${s.name}" (${s.tag}) ออกจากระบบ — ลบได้เฉพาะตอนยังไม่มีข้อมูลย้อนหลังผูกอยู่เท่านั้น`,
+      "ลบ"
+    );
+    if (!ok) return;
+    try {
+      await api.del(`/api/sensors/${encodeURIComponent(s.tag)}`);
+      toast(`ลบจุดวัด "${s.name}" แล้ว`);
+      load();
+    } catch (err) {
+      toast(err.message, "err");
     }
   }
 
@@ -129,6 +254,82 @@ export function setpointsPage(ctx) {
     }
   }
 
+  /* ---------- เพิ่ม/แก้บัญชี MongoDB ---------- */
+
+  async function editMongoAccount(a) {
+    const isNew = !a;
+    const name = el("input", { type: "text", value: a?.name ?? "", placeholder: "เช่น MongoDB Atlas — โรงงาน A" });
+    const uri = el("input", {
+      type: "password",
+      value: "",
+      placeholder: isNew ? "mongodb+srv://user:pass@cluster.mongodb.net/" : "เว้นว่างไว้ = ใช้ค่าเดิม (ไม่แสดงค่าเดิมเพื่อความปลอดภัย)",
+    });
+    const showUri = el("input", { type: "checkbox" });
+    showUri.addEventListener("change", () => { uri.type = showUri.checked ? "text" : "password"; });
+    const active = el("input", { type: "checkbox" });
+    active.checked = a ? Boolean(a.is_active) : true;
+
+    const preview = el("div", { style: "font-size:12.5px;color:var(--mute);margin-top:10px;min-height:20px" });
+    const testBtn = el("button", { class: "sm", type: "button" }, "ทดสอบการเชื่อมต่อ");
+    testBtn.addEventListener("click", async () => {
+      if (!uri.value.trim()) return toast("กรอก connection string ก่อน", "err");
+      testBtn.disabled = true;
+      preview.textContent = "กำลังเชื่อมต่อ…";
+      try {
+        await api.post("/api/mongo-accounts/test-connect", { uri: uri.value.trim() });
+        preview.textContent = "เชื่อมต่อสำเร็จ";
+      } catch (err) {
+        preview.textContent = `เชื่อมต่อไม่สำเร็จ: ${err.message}`;
+      } finally {
+        testBtn.disabled = false;
+      }
+    });
+
+    const ok = await modal({
+      title: isNew ? "เพิ่มบัญชี MongoDB" : `แก้ไขบัญชี MongoDB · ${a.name}`,
+      confirmLabel: "บันทึก",
+      body: el("div", {},
+        el("div", { class: "field" }, el("label", {}, "ชื่อบัญชี"), name),
+        el("div", { class: "field", style: "margin-top:12px" }, el("label", {}, "Connection string (URI)"), uri),
+        el("label", { style: "display:flex;gap:8px;align-items:center;margin-top:8px;color:var(--bone);font-size:13px" },
+          showUri, "แสดง URI"),
+        !isNew
+          ? el("label", { style: "display:flex;gap:8px;align-items:center;margin-top:12px;color:var(--bone);font-size:13px" },
+              active, "เปิดใช้งาน (ปิดไว้ = หยุดอ่านค่าจากจุดวัดทั้งหมดที่ผูกกับบัญชีนี้ชั่วคราว)")
+          : null,
+        el("div", { style: "margin-top:14px;border-top:1px solid var(--line);padding-top:12px" },
+          testBtn, preview)),
+      onConfirm: async () => {
+        const uriValue = uri.value.trim();
+        if (isNew && !uriValue) throw new Error("ต้องระบุ connection string (URI)");
+        const body = { name: name.value.trim() };
+        if (uriValue) body.uri = uriValue;
+        if (!isNew) body.is_active = active.checked;
+        return isNew ? api.post("/api/mongo-accounts", body) : api.put(`/api/mongo-accounts/${a.id}`, body);
+      },
+    });
+    if (ok) {
+      toast(isNew ? `เพิ่มบัญชี "${ok.account.name}" แล้ว` : `บันทึกบัญชี "${ok.account.name}" แล้ว`);
+      load();
+    }
+  }
+
+  async function deleteMongoAccount(a) {
+    const ok = await confirmDialog(
+      "ลบบัญชี MongoDB",
+      `ลบ "${a.name}" ออกจากระบบ — ลบได้เฉพาะตอนไม่มีจุดวัดผูกอยู่เท่านั้น`,
+      "ลบ"
+    );
+    if (!ok) return;
+    try {
+      await api.del(`/api/mongo-accounts/${a.id}`);
+      toast(`ลบบัญชี "${a.name}" แล้ว`);
+      load();
+    } catch (err) {
+      toast(err.message, "err");
+    }
+  }
+
   /* ---------- แก้ setpoint ---------- */
 
   async function editSetpoints(s) {
@@ -136,6 +337,8 @@ export function setpointsPage(ctx) {
       const input = el("input", { type: "number", step: "any", value: value ?? "", ...attrs });
       return { input, field: el("div", { class: "field" }, el("label", {}, label), input) };
     };
+    const rmin = mk(`พิสัยต่ำสุด (${s.unit})`, s.range_min);
+    const rmax = mk(`พิสัยสูงสุด (${s.unit})`, s.range_max);
     const ll = mk(`LL (${s.unit})`, s.ll);
     const hh = mk(`HH (${s.unit})`, s.hh);
     const llc = mk(`LL วิกฤต (${s.unit}) — เว้นว่างได้`, s.ll_critical);
@@ -143,18 +346,21 @@ export function setpointsPage(ctx) {
     const deb = mk("หน่วงเวลา (วินาที)", s.debounce_sec, { step: "1", min: "0", max: "3600" });
 
     const ok = await modal({
-      title: `setpoint · ${s.name}`,
+      title: `พิสัยและ setpoint · ${s.name}`,
       confirmLabel: "บันทึก",
       body: el("div", {},
         el("p", { style: "font-size:13px;color:var(--mute);margin-bottom:14px" },
-          `${s.tag} · พิสัยเครื่องมือวัด ${nf(s.range_min, 0)} – ${nf(s.range_max, 0)} ${s.unit}`),
-        el("div", { class: "row" }, ll.field, hh.field),
+          `${s.tag} · พิสัยเครื่องมือวัด = ช่วงค่าที่เครื่องมือวัดอ่านได้จริง ค่าที่หลุดพิสัยถือว่าน่าสงสัยและไม่สร้างแจ้งเตือน`),
+        el("div", { class: "row" }, rmin.field, rmax.field),
+        el("div", { class: "row", style: "margin-top:12px;border-top:1px solid var(--line);padding-top:12px" }, ll.field, hh.field),
         el("div", { class: "row", style: "margin-top:12px" }, llc.field, hhc.field),
         el("div", { style: "margin-top:12px" }, deb.field),
         el("p", { style: "font-size:12px;color:var(--mute);margin-top:10px" },
           "ค่าต้องหลุดช่วงต่อเนื่องครบเวลาหน่วงจึงจะสร้างการแจ้งเตือน ป้องกันข้อความถล่มจากค่าที่แกว่งชั่วขณะ")),
       onConfirm: async () =>
         api.put(`/api/sensors/${encodeURIComponent(s.tag)}/setpoints`, {
+          range_min: rmin.input.value === "" ? null : Number(rmin.input.value),
+          range_max: rmax.input.value === "" ? null : Number(rmax.input.value),
           ll: ll.input.value === "" ? null : Number(ll.input.value),
           hh: hh.input.value === "" ? null : Number(hh.input.value),
           ll_critical: llc.input.value === "" ? null : Number(llc.input.value),
@@ -163,7 +369,7 @@ export function setpointsPage(ctx) {
         }),
     });
     if (ok) {
-      toast(`บันทึก setpoint ของ ${s.tag} แล้ว`);
+      toast(`บันทึกพิสัยและ setpoint ของ ${s.tag} แล้ว`);
       load();
     }
   }
@@ -235,17 +441,25 @@ export function setpointsPage(ctx) {
       el("div", { class: "field" }, el("label", {}, "Scale (คูณ)"), scale),
       el("div", { class: "field" }, el("label", {}, "Offset (บวก)"), offset));
 
+    const mongoAccountSelect = el("select", {},
+      el("option", { value: "", selected: s.mongo_account_id == null }, "— ยังไม่เลือกบัญชี —"),
+      ...mongoAccounts.map((a) => el("option", { value: a.id, selected: s.mongo_account_id === a.id }, a.name)));
     const mongoDb = el("input", { type: "text", value: s.mongo_db ?? "", placeholder: "เช่น Tank600Q" });
     const mongoColl = el("input", { type: "text", value: s.mongo_collection ?? "", placeholder: "เช่น Level Water" });
     const mongoPollSec = el("input", { type: "number", step: "1", min: "1", max: "3600", value: s.mongo_poll_sec ?? 5 });
     const mongoPreview = el("div", { style: "font-size:12.5px;color:var(--mute);margin-top:10px;min-height:20px" });
     const mongoTestBtn = el("button", { class: "sm", type: "button" }, "ทดสอบการเชื่อมต่อ");
     mongoTestBtn.addEventListener("click", async () => {
+      if (mongoAccountSelect.value === "") return toast("เลือกบัญชี MongoDB ก่อน", "err");
       if (!mongoDb.value.trim() || !mongoColl.value.trim()) return toast("กรอก database และ collection ก่อน", "err");
       mongoTestBtn.disabled = true;
       mongoPreview.textContent = "กำลังเชื่อมต่อ…";
       try {
-        const r = await api.post("/api/mongo/test-read", { db: mongoDb.value.trim(), collection: mongoColl.value.trim() });
+        const r = await api.post("/api/mongo/test-read", {
+          account_id: Number(mongoAccountSelect.value),
+          db: mongoDb.value.trim(),
+          collection: mongoColl.value.trim(),
+        });
         if (r.sample) {
           const scaled = r.sample.value * Number(scale.value) + Number(offset.value);
           mongoPreview.textContent =
@@ -261,13 +475,15 @@ export function setpointsPage(ctx) {
     });
 
     const mongoFields = el("div", {},
-      el("div", { class: "row" },
+      el("div", { class: "field" }, el("label", {}, "บัญชี MongoDB"), mongoAccountSelect),
+      el("div", { class: "row", style: "margin-top:12px" },
         el("div", { class: "field" }, el("label", {}, "Database"), mongoDb),
         el("div", { class: "field" }, el("label", {}, "Collection"), mongoColl)),
       el("div", { class: "field", style: "margin-top:12px;max-width:160px" },
         el("label", {}, "ดึงข้อมูลทุก (วินาที)"), mongoPollSec),
       el("p", { style: "font-size:12.5px;color:var(--mute);margin-top:8px" },
-        "จุดวัดนี้จะรับค่าล่าสุดจาก MongoDB Atlas ตามความถี่ที่ตั้งไว้ด้านบน แทน PLC — ไม่ต้องตั้ง address ใด ๆ"),
+        "จุดวัดนี้จะรับค่าล่าสุดจากบัญชี MongoDB ที่เลือกตามความถี่ที่ตั้งไว้ด้านบน แทน PLC — ไม่ต้องตั้ง address ใด ๆ · " +
+        "เพิ่ม/แก้บัญชีได้จากการ์ด \"MongoDB Atlas\" ด้านบนสุดของหน้านี้"),
       el("div", { style: "margin-top:14px;border-top:1px solid var(--line);padding-top:12px" },
         mongoTestBtn, mongoPreview));
 
@@ -304,6 +520,7 @@ export function setpointsPage(ctx) {
           });
         } else {
           Object.assign(body, {
+            mongo_account_id: mongoAccountSelect.value === "" ? null : Number(mongoAccountSelect.value),
             mongo_db: mongoDb.value.trim() || null,
             mongo_collection: mongoColl.value.trim() || null,
             mongo_poll_sec: Number(mongoPollSec.value),
@@ -375,6 +592,70 @@ export function setpointsPage(ctx) {
     }
   }
 
+  function renderMongoTable() {
+    const box = clear($("#mongoTable", root));
+    if (!mongoAccounts.length) {
+      box.append(el("p", { style: "font-size:13px;color:var(--mute)" }, "ยังไม่มีบัญชี MongoDB — กด \"+ เพิ่ม MongoDB\" ด้านบน"));
+      return;
+    }
+    const table = el("table");
+    table.append(el("thead", {}, el("tr", {},
+      el("th", {}, "ชื่อ"), el("th", {}, "สถานะ"),
+      el("th", { class: "right" }, "จุดวัดที่ผูกอยู่"), el("th", {}, ""))));
+    const body = el("tbody");
+    for (const a of mongoAccounts) {
+      const count = sensors.filter((s) => s.mongo_account_id === a.id).length;
+      body.append(el("tr", {},
+        el("td", {}, a.name),
+        el("td", {}, a.is_active
+          ? el("span", { class: "pill ok" }, "เปิดใช้งาน")
+          : el("span", { class: "pill warning" }, "ปิดไว้")),
+        el("td", { class: "right num" }, count),
+        el("td", {},
+          el("div", { class: "row", style: "gap:6px;flex-wrap:nowrap" },
+            el("button", { class: "sm", onclick: () => editMongoAccount(a) }, "แก้ไข"),
+            el("button", { class: "sm danger", onclick: () => deleteMongoAccount(a) }, "ลบ")))));
+    }
+    table.append(body);
+    box.append(table);
+  }
+
+  function renderMongoStatus(status) {
+    const box = clear($("#mgStatus", root));
+
+    if (!status.accounts?.length) {
+      box.append(el("p", { style: "font-size:13px;color:var(--mute)" }, "ยังไม่มีบัญชี MongoDB — เพิ่มจากตารางด้านบน"));
+      return;
+    }
+
+    const line = (label, ok, text) =>
+      el("div", { style: "display:flex;gap:10px;align-items:center;padding:5px 0;font-size:13.5px" },
+        el("span", { class: ok ? "dot" : "dot off" }),
+        el("span", { style: "color:var(--mute);min-width:150px" }, label),
+        el("span", {}, text));
+
+    for (const a of status.accounts) {
+      add(box,
+        line(a.name, a.isActive && a.connected,
+          !a.isActive ? "ปิดใช้งานไว้" : a.connected ? `เชื่อมต่ออยู่ · ${a.mappedTags} จุดวัด` : "ยังต่อไม่ได้"),
+        a.isActive && a.lastError ? line("ข้อผิดพลาดล่าสุด", false, a.lastError) : null
+      );
+    }
+
+    if (!status.watchers?.length) {
+      box.append(el("p", { style: "font-size:13px;color:var(--mute);margin-top:8px" }, "ยังไม่มีจุดวัดที่ตั้งแหล่งข้อมูลเป็น MongoDB"));
+      return;
+    }
+
+    for (const w of status.watchers) {
+      add(box,
+        line(`${w.tag} (${w.accountName})`, !w.lastError, `${w.mongoDb}.${w.mongoCollection} · ดึงทุก ${w.pollSec} วิ`),
+        line("อ่านค่าล่าสุด", Boolean(w.lastTs), w.lastTs ? fmtDateTime(w.lastTs) : "ยังไม่เคยอ่านสำเร็จ"),
+        w.lastError ? line("ข้อผิดพลาดล่าสุด", false, w.lastError) : null
+      );
+    }
+  }
+
   function renderPlcs() {
     const box = clear($("#plcTable", root));
     if (!plcs.length) {
@@ -408,20 +689,29 @@ export function setpointsPage(ctx) {
   function renderPonds() {
     const box = clear($("#pondTable", root));
     if (!ponds.length) {
-      box.append(el("p", { style: "font-size:13px;color:var(--mute)" }, "ไม่พบข้อมูลบ่อ"));
+      box.append(el("p", { style: "font-size:13px;color:var(--mute)" }, "ไม่พบข้อมูลโซน"));
       return;
     }
     const table = el("table");
     table.append(el("thead", {}, el("tr", {},
-      el("th", {}, "รหัสบ่อ"), el("th", {}, "ชื่อ"),
-      el("th", { class: "right" }, "ความจุ (หน่วยเดียวกับที่แสดงบนแดชบอร์ด)"), el("th", {}, ""))));
+      el("th", {}, "รหัสโซน"), el("th", {}, "ชื่อ"),
+      el("th", { class: "right" }, "ความจุ (หน่วยเดียวกับที่แสดงบนแดชบอร์ด)"),
+      el("th", {}, "สถานะ"), el("th", { class: "right" }, "จุดวัดที่ผูกอยู่"), el("th", {}, ""))));
     const body = el("tbody");
     for (const p of ponds) {
+      const count = sensors.filter((s) => s.pond_id === p.pond_id).length;
       body.append(el("tr", {},
         el("td", { class: "mono" }, p.pond_id),
         el("td", {}, p.name),
         el("td", { class: "right num" }, nf(p.capacity_m3, 0)),
-        el("td", {}, el("button", { class: "sm", onclick: () => editCapacity(p) }, "แก้ไข"))));
+        el("td", {}, p.is_active
+          ? el("span", { class: "pill ok" }, "เปิดใช้งาน")
+          : el("span", { class: "pill warning" }, "ปิดไว้")),
+        el("td", { class: "right num" }, count),
+        el("td", {},
+          el("div", { class: "row", style: "gap:6px;flex-wrap:nowrap" },
+            el("button", { class: "sm", onclick: () => editPond(p) }, "แก้ไข"),
+            el("button", { class: "sm danger", onclick: () => deletePond(p) }, "ลบ")))));
     }
     table.append(body);
     box.append(table);
@@ -431,7 +721,7 @@ export function setpointsPage(ctx) {
     const box = clear($("#spTable", root));
     const table = el("table");
     table.append(el("thead", {}, el("tr", {},
-      el("th", {}, "จุดวัด"), el("th", {}, "บ่อ"), el("th", {}, "หน่วย"),
+      el("th", {}, "จุดวัด"), el("th", {}, "โซน"), el("th", {}, "หน่วย"),
       el("th", { class: "right" }, "พิสัย"),
       el("th", { class: "right" }, "LL วิกฤต"), el("th", { class: "right" }, "LL"),
       el("th", { class: "right" }, "HH"), el("th", { class: "right" }, "HH วิกฤต"),
@@ -442,12 +732,12 @@ export function setpointsPage(ctx) {
     for (const s of sensors) {
       const dp = s.decimals ?? 1;
       const mb = s.data_source === "mongodb"
-        ? (s.mongo_db && s.mongo_collection
+        ? (s.mongo_account_id != null && s.mongo_db && s.mongo_collection
             ? el("div", {},
-                el("span", { class: "pill ok" }, "MongoDB Atlas"),
+                el("span", { class: "pill ok" }, s.mongo_account_name ?? "MongoDB Atlas"),
                 el("div", { style: "color:var(--mute);font-size:11.5px;margin-top:2px" },
                   `${s.mongo_db}.${s.mongo_collection} · ดึงทุก ${s.mongo_poll_sec ?? 5} วิ`))
-            : el("span", { class: "pill warning" }, "ยังไม่ตั้ง DB/Collection"))
+            : el("span", { class: "pill warning" }, s.mongo_account_id == null ? "ยังไม่เลือกบัญชี MongoDB" : "ยังไม่ตั้ง DB/Collection"))
         : s.plc_id == null || s.modbus_address == null
         ? el("span", { class: "pill warning" }, s.plc_id == null ? "ยังไม่เลือก PLC" : "ยังไม่ตั้ง address")
         : el("div", {},
@@ -472,8 +762,10 @@ export function setpointsPage(ctx) {
         el("td", { class: "wrap" }, mb),
         el("td", {},
           el("div", { class: "row", style: "gap:6px;flex-wrap:nowrap" },
-            el("button", { class: "sm", onclick: () => editSetpoints(s) }, "setpoint"),
-            el("button", { class: "sm", onclick: () => editModbus(s) }, "แหล่งข้อมูล")))));
+            el("button", { class: "sm", onclick: () => editSetpoints(s) }, "พิสัย / setpoint"),
+            el("button", { class: "sm", onclick: () => editModbus(s) }, "แหล่งข้อมูล"),
+            el("button", { class: "sm", onclick: () => editSensorInfo(s) }, "ข้อมูล"),
+            el("button", { class: "sm danger", onclick: () => deleteSensor(s) }, "ลบ")))));
     }
     table.append(body);
     box.append(table);
@@ -481,17 +773,21 @@ export function setpointsPage(ctx) {
 
   async function load() {
     try {
-      const [meta, mb] = await Promise.all([
+      const [meta, mb, mg] = await Promise.all([
         api.get("/api/sensors"),
         api.get("/api/modbus/status").catch(() => null),
+        api.get("/api/mongo/status").catch(() => null),
       ]);
       sensors = meta.sensors;
       ponds = meta.ponds ?? [];
       plcs = meta.plcs ?? [];
+      mongoAccounts = meta.mongoAccounts ?? [];
       renderPlcs();
       renderSensors();
       renderPonds();
+      renderMongoTable();
       if (mb) renderModbusStatus(mb.status, mb.blocks);
+      if (mg) renderMongoStatus(mg.status);
     } catch (err) {
       toast(err.message, "err");
     }
@@ -502,6 +798,9 @@ export function setpointsPage(ctx) {
     if (!document.hidden && !document.querySelector(".modal-bg")) {
       api.get("/api/modbus/status")
         .then((mb) => renderModbusStatus(mb.status, mb.blocks))
+        .catch(() => {});
+      api.get("/api/mongo/status")
+        .then((mg) => renderMongoStatus(mg.status))
         .catch(() => {});
     }
   }, 5000);
