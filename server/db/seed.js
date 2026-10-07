@@ -1,6 +1,9 @@
 import { query } from "./index.js";
 import { hashSecret } from "../lib/hash.js";
 import { config } from "../config.js";
+import {
+  STANDARD_VISIBLE_CARDS, STANDARD_HIDDEN_TAGS, STANDARD_LAYOUT, STANDARD_DIAGRAM,
+} from "../../public/js/standardDashboard.js";
 
 /* ค่า LL/HH และความจุทั้งหมดยังเป็นค่าสมมติจาก prototype
    ต้องแทนด้วยค่าจริงจากหน้างานก่อนใช้งานจริง (Product.md ข้อ 11.4, 11.5) */
@@ -16,12 +19,12 @@ const AI_BASE = 528;
 const LEVEL_SCALE = 0.1;
 
 export const PONDS = [
-  { pond_id: "1A",   name: "บ่อ 1A",   capacity_m3: 1200, sort_order: 1, role_note: "จ่ายเข้าสายผลิต",        src_note: "Softener",                     dst_note: "สายการผลิต" },
-  { pond_id: "1B",   name: "บ่อ 1B",   capacity_m3: 1200, sort_order: 2, role_note: "รับน้ำจาก Softener + น้ำกลับ",   src_note: "Softener · Cooling Tower",     dst_note: "บ่อ 2" },
-  { pond_id: "2",    name: "บ่อ 2",    capacity_m3: 1800, sort_order: 3, role_note: "บ่อกระจายน้ำ",           src_note: "บ่อ 1B · Retort A–E",          dst_note: "บ่อ 3 · บ่อ 4 · Cooling Tower" },
-  { pond_id: "3",    name: "บ่อ 3",    capacity_m3: 1800, sort_order: 4, role_note: "รับน้ำจาก Cooling Tower", src_note: "บ่อ 2 · Cooling Tower",        dst_note: "—" },
-  { pond_id: "4",    name: "บ่อ 4",    capacity_m3: 2400, sort_order: 5, role_note: "รับน้ำกลับ Retort F–N",  src_note: "บ่อ 2 · Retort F–N",           dst_note: "บ่อ 5" },
-  { pond_id: "5",    name: "บ่อ 5",    capacity_m3: 3000, sort_order: 6, role_note: "จุดวัดอุณหภูมิ",         src_note: "บ่อ 4",                        dst_note: "Cooling Tower → บ่อ 1B" },
+  { pond_id: "1A",   name: "บ่อ 1A",   capacity_m3: 74,   sort_order: 1, role_note: "จ่ายเข้าสายผลิต",        src_note: "Softener",                     dst_note: "สายการผลิต" },
+  { pond_id: "1B",   name: "บ่อ 1B",   capacity_m3: 74,   sort_order: 2, role_note: "รับน้ำจาก Softener + น้ำกลับ",   src_note: "Softener · Cooling Tower",     dst_note: "บ่อ 2" },
+  { pond_id: "2",    name: "บ่อ 2",    capacity_m3: 173,  sort_order: 3, role_note: "บ่อกระจายน้ำ",           src_note: "บ่อ 1B · Retort A–E",          dst_note: "บ่อ 3 · บ่อ 4 · Cooling Tower" },
+  { pond_id: "3",    name: "บ่อ 3",    capacity_m3: 155,  sort_order: 4, role_note: "รับน้ำจาก Cooling Tower", src_note: "บ่อ 2 · Cooling Tower",        dst_note: "—" },
+  { pond_id: "4",    name: "บ่อ 4",    capacity_m3: 255,  sort_order: 5, role_note: "รับน้ำกลับ Retort F–N",  src_note: "บ่อ 2 · Retort F–N",           dst_note: "บ่อ 5" },
+  { pond_id: "5",    name: "บ่อ 5",    capacity_m3: 155,  sort_order: 6, role_note: "จุดวัดอุณหภูมิ",         src_note: "บ่อ 4",                        dst_note: "Cooling Tower → บ่อ 1B" },
   { pond_id: "600Q", name: "บ่อ 600Q", capacity_m3: 600,  sort_order: 7, role_note: "บ่ออิสระ",               src_note: "ท่อน้ำเข้า",                    dst_note: "—" },
 ];
 
@@ -81,23 +84,26 @@ export const DEFAULT_SETTINGS = {
   // ตัดข้อมูลดิบที่เก่ากว่า N วันทิ้งทุกวัน ให้เหลือแค่ข้อมูลล่าสุดตามที่ตั้งไว้ (0 = ปิด ใช้แค่ retention.raw_months)
   "retention.raw_days": 30,
   // แอดมินเลือกได้ว่าการ์ดไหนบนหน้า Dashboard จะแสดง — มีผลกับทุกคนที่เข้าดู (ตั้งจากหน้า Dashboard โดยตรง)
-  "dashboard.visible_cards": { diagram: true, instruments: true, chart: true, alarms: true },
+  "dashboard.visible_cards": STANDARD_VISIBLE_CARDS,
   // ซ่อนเครื่องมือวัดรายจุด (เช่น แรงดันลม/ไอน้ำ) โดยไม่ต้องปิดทั้งการ์ด — เก็บเป็นรายการ tag ที่ซ่อน
-  "dashboard.hidden_tags": [],
-  // layout ตารางของหน้า Dashboard ที่แอดมินจัดเอง — null = ใช้ layout เริ่มต้นที่หน้าเว็บสร้างจาก visible_cards
-  "dashboard.layout": null,
-  // ผังบ่อ (ถัง อุปกรณ์ เกจ เส้นท่อ) ที่แอดมินจัดเอง — null = ใช้ผังเริ่มต้นใน public/js/diagram.js
-  "dashboard.diagram": null,
+  "dashboard.hidden_tags": STANDARD_HIDDEN_TAGS,
+  // layout ตารางของหน้า Dashboard — ตั้งต้นด้วยค่ามาตรฐานใน public/js/standardDashboard.js (id สร้างใหม่ตอน seed)
+  "dashboard.layout": { items: STANDARD_LAYOUT.items.map((i, n) => ({ ...i, id: `std${n}` })) },
+  // ผังบ่อ (ถัง อุปกรณ์ เกจ เส้นท่อ) — ตั้งต้นด้วยค่ามาตรฐานใน public/js/standardDashboard.js
+  "dashboard.diagram": STANDARD_DIAGRAM,
 };
 
+const isEmpty = async (table) => (await query(`SELECT NOT EXISTS (SELECT 1 FROM ${table}) AS empty`)).rows[0].empty;
+
+/* บ่อและจุดวัดแก้/เปลี่ยนชื่อ/ลบได้จากหน้าเว็บ (ความจุ ชื่อ พิสัย ฯลฯ) — seed ใส่ให้เฉพาะตอนฐานข้อมูลยังว่าง
+   ไม่อย่างนั้นทุกครั้งที่ restart จะเขียนค่าที่แก้ไว้กลับเป็นค่าในไฟล์นี้ หรือสร้างตัวที่ลบ/เปลี่ยนชื่อไปแล้วขึ้นมาใหม่ */
 async function upsertPonds() {
+  if (!(await isEmpty("ponds"))) return;
   for (const p of PONDS) {
     await query(
       `INSERT INTO ponds (pond_id, name, capacity_m3, sort_order, role_note, src_note, dst_note)
        VALUES ($1,$2,$3,$4,$5,$6,$7)
-       ON CONFLICT (pond_id) DO UPDATE SET
-         name=EXCLUDED.name, capacity_m3=EXCLUDED.capacity_m3, sort_order=EXCLUDED.sort_order,
-         role_note=EXCLUDED.role_note, src_note=EXCLUDED.src_note, dst_note=EXCLUDED.dst_note`,
+       ON CONFLICT (pond_id) DO NOTHING`,
       [p.pond_id, p.name, p.capacity_m3, p.sort_order, p.role_note, p.src_note, p.dst_note]
     );
   }
@@ -156,24 +162,14 @@ async function backfillMongoAccountFromEnv() {
 }
 
 async function upsertSensors() {
+  if (!(await isEmpty("sensors"))) return;
   for (const s of SENSORS) {
-    // setpoint และการตั้งค่า Modbus ที่แก้ไว้จากหน้าจอต้องไม่ถูกเขียนทับตอน seed ซ้ำ
-    // จึงอัปเดตเฉพาะข้อมูลนิยาม ส่วน address เติมให้เฉพาะตอนที่ยังว่างอยู่จริง ๆ "และ" ยังใช้แหล่งข้อมูลเป็น modbus อยู่
-    // (address เป็น null ได้สองแบบ: ยังไม่เคยตั้ง กับตั้งใจเคลียร์ทิ้งเพราะสลับไปใช้แหล่งอื่นแล้ว เช่น MongoDB — ต้องไม่ไปเติมคืนให้แบบหลัง)
     await query(
       `INSERT INTO sensors (tag, pond_id, name, metric, unit, range_min, range_max,
                             ll, hh, ll_critical, hh_critical, decimals, sort_order,
                             modbus_address, modbus_scale)
        VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15)
-       ON CONFLICT (tag) DO UPDATE SET
-         pond_id=EXCLUDED.pond_id, name=EXCLUDED.name, metric=EXCLUDED.metric,
-         unit=EXCLUDED.unit, range_min=EXCLUDED.range_min, range_max=EXCLUDED.range_max,
-         decimals=EXCLUDED.decimals, sort_order=EXCLUDED.sort_order,
-         modbus_address=CASE WHEN sensors.data_source = 'modbus'
-                             THEN COALESCE(sensors.modbus_address, EXCLUDED.modbus_address)
-                             ELSE sensors.modbus_address END,
-         modbus_scale=CASE WHEN sensors.data_source = 'modbus' AND sensors.modbus_address IS NULL
-                           THEN EXCLUDED.modbus_scale ELSE sensors.modbus_scale END`,
+       ON CONFLICT (tag) DO NOTHING`,
       [s.tag, s.pond_id, s.name, s.metric, s.unit, s.range_min, s.range_max,
        s.ll, s.hh, s.ll_critical, s.hh_critical, s.decimals, s.sort_order,
        s.modbus_address ?? null, s.modbus_scale ?? 1]

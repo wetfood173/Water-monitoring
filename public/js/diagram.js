@@ -1,4 +1,5 @@
 import { POND_COLOR, colorForTag } from "./chart.js";
+import { STANDARD_DIAGRAM } from "./standardDashboard.js";
 
 /**
  * ผังบ่อและทิศทางการไหล — ค่าเริ่มต้นบนแคนวาส 1120 × 684
@@ -98,8 +99,16 @@ function parsePath(d) {
   return pts;
 }
 
-/** ผังเริ่มต้น — ตรงกับผังที่วาดมือไว้เดิม (LAYOUT, PIPES, ...) */
+/** ผังเริ่มต้น — ใช้ผังมาตรฐาน (standardDashboard.js) ตัดเกจของจุดวัดที่ไม่มีแล้วหรือถูกซ่อนออก */
 export function defaultDiagram(sensors, hiddenTags = new Set()) {
+  const has = (tag) => sensors.some((s) => s.tag === tag) && !hiddenTags.has(tag);
+  const std = structuredClone(STANDARD_DIAGRAM);
+  if (!std?.items?.length) return originalDiagram(sensors, hiddenTags);
+  return { ...std, items: std.items.filter((i) => !i.tag || has(i.tag)) };
+}
+
+/** ผังที่วาดมือไว้เดิม (LAYOUT, PIPES, ...) — ใช้แทนเมื่อไม่มีผังมาตรฐาน */
+function originalDiagram(sensors, hiddenTags = new Set()) {
   const has = (tag) => sensors.some((s) => s.tag === tag) && !hiddenTags.has(tag);
   return {
     items: [

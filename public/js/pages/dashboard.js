@@ -5,6 +5,7 @@ import {
   MOBILE_GROUPS, DIALS, buildDialSvg, dialRotation, DIAL_CENTER, renderDiagram, defaultDiagram, styleValue, weight,
 } from "../diagram.js";
 import { openDiagramEditor } from "../diagramEditor.js";
+import { STANDARD_LAYOUT } from "../standardDashboard.js";
 import { createHistory, handleUndoKeys } from "../history.js";
 import { COLS, ROW_H, GAP, compact, cellAt, columnWidth, startDrag } from "../dashgrid.js";
 
@@ -466,7 +467,14 @@ export function dashboardPage(ctx) {
     refreshAlarms().catch(() => {});
   }
 
+  /** layout มาตรฐาน (standardDashboard.js) — ตัดเกจของจุดวัดที่ไม่มีแล้วหรือถูกซ่อนออก */
   function defaultLayout() {
+    const has = (tag) => sensors.some((s) => s.tag === tag) && !hiddenTags.has(tag);
+    const items = STANDARD_LAYOUT.items.filter((i) => !i.tag || has(i.tag)).map((i) => ({ ...i, id: newId() }));
+    return items.length ? compact(items) : generatedLayout();
+  }
+
+  function generatedLayout() {
     const items = [];
     let y = 0;
     if (cardVisibility.diagram !== false) {
